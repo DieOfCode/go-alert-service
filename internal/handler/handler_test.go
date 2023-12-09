@@ -19,9 +19,7 @@ func TestHandler_HandleUpdateMetric(t *testing.T) {
 		name   string
 		fields fields
 		args   args
-	}{
-		// TODO: Add test cases.
-	}
+	}{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &Handler{
