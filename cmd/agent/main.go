@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"math/rand"
 	"net/http"
 	"os/signal"
@@ -38,7 +39,7 @@ loop:
 			metrics = append(metrics, m.Metric{MetricType: m.Counter, MetricName: m.PoolCount, Value: counter})
 			err := agent.SendMetric(ctx, *httpClient, metrics)
 			if err != nil {
-				//TODO handle error
+				log.Fatal(err)
 			}
 		case <-poolTicker.C:
 			counter++
