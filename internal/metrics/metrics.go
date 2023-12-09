@@ -7,6 +7,11 @@ const (
 	Counter MetricType = "counter"
 )
 
+const (
+	PoolCount   string = "PollCount"
+	RandomValue string = "RandomValue"
+)
+
 type Metric struct {
 	MetricType MetricType
 	MetricName string

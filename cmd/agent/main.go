@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"math/rand"
 	"net/http"
 	"os/signal"
 	"syscall"
@@ -34,14 +35,20 @@ loop:
 	for {
 		select {
 		case <-reportTicker.C:
-			metrics = append(metrics, m.Metric{MetricType: m.Counter, MetricName: "PollCount", Value: counter})
+			metrics = append(metrics, m.Metric{MetricType: m.Counter, MetricName: m.PoolCount, Value: counter})
 			err := agent.SendMetric(ctx, *httpClient, metrics)
 			if err != nil {
 				//TODO handle error
 			}
 		case <-poolTicker.C:
+			counter++
+			metrics = agent.CollectGaudeMetrics()
+			metrics = append(metrics, m.Metric{MetricType: m.Gauge, MetricName: m.RandomValue, Value: rand.Float64()})
 
 		default:
+
+			poolTicker.Stop()
+			reportTicker.Stop()
 			break loop
 		}
 	}

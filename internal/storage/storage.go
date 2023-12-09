@@ -2,9 +2,7 @@ package storage
 
 import (
 	"fmt"
-	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/DieOfCode/go-alert-service/internal/metrics"
@@ -13,6 +11,10 @@ import (
 type MemStorage struct {
 	mu      sync.Mutex
 	metrics map[string]metrics.Metric
+}
+
+type Repository interface {
+	UpdateMetric(metricType metrics.MetricType, metricName string, value string) error
 }
 
 func NewMemStorage() *MemStorage {
@@ -56,26 +58,4 @@ func (m *MemStorage) UpdateMetric(metricType metrics.MetricType, metricName stri
 	}
 
 	return nil
-}
-
-func (m *MemStorage) HandleUpdateMetric(w http.ResponseWriter, r *http.Request) {
-	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/update/"), "/")
-
-	if len(parts) != 3 {
-		http.Error(w, "Попытка передать запрос без имени метрики", http.StatusNotFound)
-		return
-	}
-
-	metricType := metrics.MetricType(parts[0])
-	metricName := parts[1]
-	metricValue := parts[2]
-
-	err := m.UpdateMetric(metricType, metricName, metricValue)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, "Метрика успешно обновлена")
 }
