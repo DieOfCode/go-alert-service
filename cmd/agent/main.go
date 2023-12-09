@@ -20,17 +20,17 @@ var (
 
 func main() {
 
-	httpClient := &http.Client{}
+	httpClient := &http.Client{
+		Timeout: time.Minute,
+	}
+
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGKILL, syscall.SIGTERM, syscall.SIGINT)
+	defer cancel()
 
 	poolTicker := time.NewTicker(poolInterval)
 	reportTicker := time.NewTicker(reportInterval)
-
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGKILL, syscall.SIGTERM, syscall.SIGINT)
-
 	var metrics []m.Metric
 	var counter int64
-
-	defer cancel()
 
 loop:
 	for {
@@ -46,7 +46,7 @@ loop:
 			metrics = agent.CollectGaudeMetrics()
 			metrics = append(metrics, m.Metric{MetricType: m.Gauge, MetricName: m.RandomValue, Value: rand.Float64()})
 
-		default:
+		case <-ctx.Done():
 
 			poolTicker.Stop()
 			reportTicker.Stop()
