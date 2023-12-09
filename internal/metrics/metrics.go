@@ -8,5 +8,14 @@ const (
 )
 
 type Metric struct {
-	Value interface{}
+	MetricType MetricType
+	MetricName string
+	Value      interface{}
+}
+
+var GaugeMetrics = []string{
+	"MCacheSys", "MSpanInuse", "MSpanSys", "Mallocs", "NextGC", "NumForcedGC", "NumGC", "OtherSys",
+	"TotalAlloc", "Alloc", "BuckHashSys", "Frees", "GCCPUFraction", "GCSys", "HeapAlloc", "HeapIdle",
+	"PauseTotalNs", "StackInuse", "StackSys", "Sys",
+	"HeapInuse", "HeapObjects", "HeapReleased", "HeapSys", "LastGC", "Lookups", "MCacheInuse",
 }
