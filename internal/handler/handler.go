@@ -44,7 +44,7 @@ func (m *Handler) HandleUpdateMetric(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Handler) HandleGetMetricByName(w http.ResponseWriter, r *http.Request) {
-	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/update/"), "/")
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/value/"), "/")
 
 	if len(parts) != 2 {
 		http.Error(w, "Попытка передать запрос без имени метрики", http.StatusNotFound)
