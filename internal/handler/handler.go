@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"html/template"
 	"net/http"
 	"strings"
 
@@ -39,5 +40,61 @@ func (m *Handler) HandleUpdateMetric(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, "Метрика успешно обновлена")
+
+}
+
+func (m *Handler) HandleGetMetricByName(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/update/"), "/")
+
+	if len(parts) != 2 {
+		http.Error(w, "Попытка передать запрос без имени метрики", http.StatusNotFound)
+		return
+	}
+
+	metricName := parts[1]
+
+	metric, err := m.repository.GetMetricByName(metricName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte(fmt.Sprintf("%d", metric.Value)))
+	w.WriteHeader(http.StatusOK)
+
+	fmt.Fprint(w, "Метрика успешно обновлена")
+
+}
+
+func (m *Handler) HandleGetAllMetrics(w http.ResponseWriter, r *http.Request) {
+	tmpl := `
+	<!DOCTYPE html>
+	<html>
+	<head>
+		<title>Список метрик</title>
+	</head>
+	<body>
+		<h1>Список метрик</h1>
+		<ul>
+		{{range $name, $metric := .Metrics}}
+			<li>{{$name}}: {{$metric.Value}}</li>
+		{{end}}
+		</ul>
+	</body>
+	</html>`
+	template, err := template.New("metrics").Parse(tmpl)
+	if err != nil {
+		http.Error(w, "Ошибка создания шаблона", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html")
+
+	err = template.Execute(w, m.repository.GetAllMetrics())
+
+	if err != nil {
+		http.Error(w, "Ошибка выполнения шаблона", http.StatusInternalServerError)
+		return
+	}
 
 }
