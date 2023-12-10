@@ -54,7 +54,12 @@ func (storage *MemStorage) UpdateMetric(metricType metrics.MetricType, metricNam
 				return fmt.Errorf("некорректное предыдущее значение для типа counter: %v", existingMetric.Value)
 			}
 		} else {
-			storage.metrics[key] = metrics.Metric{Value: value}
+			if newValue, err := strconv.ParseInt(value, 10, 64); err == nil {
+				storage.metrics[key] = metrics.Metric{Value: newValue}
+			} else {
+				return fmt.Errorf("некорректное значение для типа counter: %v", value)
+			}
+
 		}
 	default:
 		return fmt.Errorf("некорректный тип метрики: %s", metricType)

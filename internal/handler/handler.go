@@ -57,7 +57,7 @@ func (m *Handler) HandleGetMetricByName(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-
+	print("МЕТРИКА ПОЛУЧЕНА")
 	w.Header().Set("Content-Type", "text/plain")
 	if metricType == metrics.Gauge {
 		w.Write([]byte(fmt.Sprintf("%.3f", metric.Value.(float64))))
