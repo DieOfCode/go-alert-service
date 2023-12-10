@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/DieOfCode/go-alert-service/internal/metrics"
@@ -60,7 +61,7 @@ func (m *Handler) HandleGetMetricByName(w http.ResponseWriter, r *http.Request) 
 	print("МЕТРИКА ПОЛУЧЕНА")
 	w.Header().Set("Content-Type", "text/plain")
 	if metricType == metrics.Gauge {
-		w.Write([]byte(fmt.Sprintf("%.3f", metric.Value.(float64))))
+		w.Write([]byte(strconv.FormatFloat(metric.Value.(float64), 'f', -1, 64)))
 	}
 	if metricType == metrics.Counter {
 		w.Write([]byte(fmt.Sprintf("%d", metric.Value.(int64))))
