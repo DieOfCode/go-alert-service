@@ -65,10 +65,10 @@ func (m *Handler) HandleGetMetricByName(w http.ResponseWriter, r *http.Request) 
 	w.Write([]byte(fmt.Sprintf("%d", metric.Value)))
 
 	if metricType == metrics.Gauge {
-		w.Write([]byte(fmt.Sprintf("%.3f", metric.Value.(float64))))
+		w.Write([]byte(metric.Value.(string)))
 	}
 	if metricType == metrics.Counter {
-		w.Write([]byte(fmt.Sprintf("%d", metric.Value.(int64))))
+		w.Write([]byte(metric.Value.(string)))
 	}
 	w.WriteHeader(http.StatusOK)
 
