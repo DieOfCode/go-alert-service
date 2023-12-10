@@ -32,9 +32,6 @@ func (m *Handler) HandleUpdateMetric(w http.ResponseWriter, r *http.Request) {
 	metricValue := parts[2]
 
 	err := m.repository.UpdateMetric(metricType, metricName, metricValue)
-	metrics := m.repository.GetAllMetrics()
-	fmt.Println("METRICS")
-	fmt.Println(metrics)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -65,7 +62,7 @@ func (m *Handler) HandleGetMetricByName(w http.ResponseWriter, r *http.Request) 
 	if metricType == metrics.Gauge {
 		w.Write([]byte(fmt.Sprintf("%.3f", metric.Value.(float64))))
 	}
-	if metricType == metrics.Gauge {
+	if metricType == metrics.Counter {
 		w.Write([]byte(fmt.Sprintf("%d", metric.Value.(int64))))
 	}
 	w.WriteHeader(http.StatusOK)
