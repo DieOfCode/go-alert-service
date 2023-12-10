@@ -10,6 +10,7 @@ import (
 )
 
 func main() {
+	parseFlags()
 	memStorage := storage.NewMemStorage()
 	handler := handler.NewHandler(memStorage)
 
@@ -21,7 +22,7 @@ func main() {
 		r.MethodFunc(http.MethodGet, "/", handler.HandleGetAllMetrics)
 	})
 
-	err := http.ListenAndServe(":8080", router)
+	err := http.ListenAndServe(serverAddress, router)
 
 	if err != nil {
 		fmt.Println("Ошибка запуска сервера:", err)

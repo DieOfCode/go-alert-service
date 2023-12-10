@@ -13,13 +13,8 @@ import (
 	m "github.com/DieOfCode/go-alert-service/internal/metrics"
 )
 
-var (
-	reportInterval = time.Second * 10
-	poolInterval   = time.Second * 5
-)
-
 func main() {
-
+	parseFlags()
 	httpClient := &http.Client{
 		Timeout: time.Minute,
 	}
@@ -27,8 +22,8 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGKILL, syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 
-	poolTicker := time.NewTicker(poolInterval)
-	reportTicker := time.NewTicker(reportInterval)
+	poolTicker := time.NewTicker(time.Duration(poolInterval) * time.Second)
+	reportTicker := time.NewTicker(time.Duration(reportInterval) * time.Second)
 	var metrics []m.Metric
 	var counter int64
 
@@ -37,7 +32,7 @@ loop:
 		select {
 		case <-reportTicker.C:
 			metrics = append(metrics, m.Metric{MetricType: m.Counter, MetricName: m.PoolCount, Value: counter})
-			err := agent.SendMetric(ctx, *httpClient, metrics)
+			err := agent.SendMetric(ctx, *httpClient, metrics, addressHttp)
 			if err != nil {
 				log.Fatal(err)
 			}

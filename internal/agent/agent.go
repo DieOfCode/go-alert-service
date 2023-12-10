@@ -40,7 +40,7 @@ func CollectGaudeMetrics() []m.Metric {
 	return collectedMerics
 }
 
-func SendMetric(ctx context.Context, client http.Client, metrics []m.Metric) error {
+func SendMetric(ctx context.Context, client http.Client, metrics []m.Metric, address string) error {
 	wg := sync.WaitGroup{}
 	wg.Add(len(metrics))
 
@@ -48,7 +48,7 @@ func SendMetric(ctx context.Context, client http.Client, metrics []m.Metric) err
 
 		go func(element m.Metric) {
 			defer wg.Done()
-			request := fmt.Sprintf("http://localhost:8080/update/%s/%s/%v", element.MetricType, element.MetricName, element.Value)
+			request := fmt.Sprintf("http://%s/update/%s/%s/%v", address, element.MetricType, element.MetricName, element.Value)
 			req, err := http.NewRequestWithContext(ctx, http.MethodPost, request, nil)
 			if err != nil {
 				log.Println(err)
