@@ -22,7 +22,6 @@ func NewHandler(repository s.Repository) *Handler {
 
 func (m *Handler) HandleUpdateMetric(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/update/"), "/")
-
 	if len(parts) != 3 {
 		http.Error(w, "Попытка передать запрос без имени метрики", http.StatusNotFound)
 		return
@@ -33,6 +32,9 @@ func (m *Handler) HandleUpdateMetric(w http.ResponseWriter, r *http.Request) {
 	metricValue := parts[2]
 
 	err := m.repository.UpdateMetric(metricType, metricName, metricValue)
+	metrics := m.repository.GetAllMetrics()
+	fmt.Println("METRICS")
+	fmt.Println(metrics)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -50,10 +52,10 @@ func (m *Handler) HandleGetMetricByName(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Попытка передать запрос без имени метрики", http.StatusNotFound)
 		return
 	}
-
+	metricType := metrics.MetricType(parts[0])
 	metricName := parts[1]
 
-	metric, err := m.repository.GetMetricByName(metricName)
+	metric, err := m.repository.GetMetricByName(metricType, metricName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -63,8 +65,6 @@ func (m *Handler) HandleGetMetricByName(w http.ResponseWriter, r *http.Request) 
 	w.Write([]byte(fmt.Sprintf("%d", metric.Value)))
 	w.WriteHeader(http.StatusOK)
 
-	fmt.Fprint(w, "Метрика успешно обновлена")
-
 }
 
 func (m *Handler) HandleGetAllMetrics(w http.ResponseWriter, r *http.Request) {
@@ -72,10 +72,10 @@ func (m *Handler) HandleGetAllMetrics(w http.ResponseWriter, r *http.Request) {
 	<!DOCTYPE html>
 	<html>
 	<head>
-		<title>Список метрик</title>
+		<title>Metrics list</title>
 	</head>
 	<body>
-		<h1>Список метрик</h1>
+		<h1>Metrics list</h1>
 		<ul>
 		{{range $name, $metric := .Metrics}}
 			<li>{{$name}}: {{$metric.Value}}</li>

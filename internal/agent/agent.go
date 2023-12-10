@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"reflect"
 	"runtime"
@@ -48,15 +49,15 @@ func SendMetric(ctx context.Context, client http.Client, metrics []m.Metric) err
 		go func(element m.Metric) {
 			defer wg.Done()
 			request := fmt.Sprintf("http://localhost:8080/update/%s/%s/%v", element.MetricType, element.MetricName, element.Value)
-			req, err := http.NewRequestWithContext(ctx, "POST", request, nil)
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, request, nil)
 			if err != nil {
-				//TODO handle error
+				log.Println(err)
 				return
 			}
 			req.Header.Set("Content-Type", "text/plain")
 			resp, err := client.Do(req)
 			if err != nil {
-				//TODO handle error
+				log.Println(err)
 				return
 			}
 			resp.Body.Close()
