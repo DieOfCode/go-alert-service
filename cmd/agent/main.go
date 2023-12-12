@@ -10,29 +10,30 @@ import (
 	"time"
 
 	"github.com/DieOfCode/go-alert-service/internal/agent"
+	"github.com/DieOfCode/go-alert-service/internal/configuration"
 	m "github.com/DieOfCode/go-alert-service/internal/metrics"
 )
 
 func main() {
-	parseFlags()
+	var metrics []m.Metric
+	var counter int64
+	config := configuration.AgentConfiguration()
 	httpClient := &http.Client{
 		Timeout: time.Minute,
 	}
 
+	poolTicker := time.NewTicker(time.Duration(config.PollInterval) * time.Second)
+	reportTicker := time.NewTicker(time.Duration(config.ReportInterval) * time.Second)
+
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGKILL, syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
-
-	poolTicker := time.NewTicker(time.Duration(poolInterval) * time.Second)
-	reportTicker := time.NewTicker(time.Duration(reportInterval) * time.Second)
-	var metrics []m.Metric
-	var counter int64
 
 loop:
 	for {
 		select {
 		case <-reportTicker.C:
 			metrics = append(metrics, m.Metric{MetricType: m.Counter, MetricName: m.PoolCount, Value: counter})
-			err := agent.SendMetric(ctx, *httpClient, metrics, adressHTTP)
+			err := agent.SendMetric(ctx, *httpClient, metrics, config.ServerAddress)
 			if err != nil {
 				log.Fatal(err)
 			}
