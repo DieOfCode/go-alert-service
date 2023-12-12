@@ -9,7 +9,7 @@ import (
 
 type Config struct {
 	PollInterval   int    `env:"POLL_INTERVAL"`
-	ServerAddress  string `env:"SERVER_ADDRESS"`
+	ServerAddress  string `env:"ADDRESS"`
 	ReportInterval int    `env:"REPORT_INTERVAL"`
 }
 

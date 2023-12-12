@@ -4,13 +4,15 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/DieOfCode/go-alert-service/internal/configuration"
 	"github.com/DieOfCode/go-alert-service/internal/handler"
 	"github.com/DieOfCode/go-alert-service/internal/storage"
 	"github.com/go-chi/chi/v5"
 )
 
 func main() {
-	parseFlags()
+
+	config := configuration.ServerConfiguration()
 	memStorage := storage.NewMemStorage()
 	handler := handler.NewHandler(memStorage)
 
@@ -22,7 +24,7 @@ func main() {
 		r.MethodFunc(http.MethodGet, "/", handler.HandleGetAllMetrics)
 	})
 
-	err := http.ListenAndServe(serverAddress, router)
+	err := http.ListenAndServe(config.ServerAddress, router)
 
 	if err != nil {
 		fmt.Println("Ошибка запуска сервера:", err)
