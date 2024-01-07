@@ -33,7 +33,7 @@ loop:
 		select {
 		case <-reportTicker.C:
 			metrics = append(metrics, m.Metric{MetricType: m.Counter, MetricName: m.PoolCount, Value: counter})
-			err := agent.SendMetric(ctx, *httpClient, metrics, config.ServerAddress)
+			err := agent.SendMetric(ctx, httpClient, metrics, config.ServerAddress)
 			if err != nil {
 				log.Fatal(err)
 			}
