@@ -30,7 +30,7 @@ func main() {
 	})
 
 	err := http.ListenAndServe(config.ServerAddress, router)
-
+	logger.Info().Msgf("Server is listerning on %s", config.ServerAddress)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("Server start error")
 	}
