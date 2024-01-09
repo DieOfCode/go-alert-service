@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
-	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -12,9 +12,11 @@ import (
 	"github.com/DieOfCode/go-alert-service/internal/agent"
 	"github.com/DieOfCode/go-alert-service/internal/configuration"
 	m "github.com/DieOfCode/go-alert-service/internal/metrics"
+	"github.com/rs/zerolog"
 )
 
 func main() {
+	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 	var metrics []m.Metric
 	var counter int64
 	config := configuration.AgentConfiguration()
@@ -28,6 +30,11 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGKILL, syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 
+	logger.Info().
+		Int("pollInterval", config.PollInterval).
+		Int("reportInterval", config.ReportInterval).
+		Msg("Started collecting metrics")
+
 loop:
 	for {
 		select {
@@ -35,12 +42,15 @@ loop:
 			metrics = append(metrics, m.Metric{MetricType: m.Counter, MetricName: m.PoolCount, Value: counter})
 			err := agent.SendMetric(ctx, httpClient, metrics, config.ServerAddress)
 			if err != nil {
-				log.Fatal(err)
+				logger.Fatal().Err(err).Msg("Send metrics error")
+			} else {
+				logger.Info().Interface("metrics", metrics).Msg("Metrics sent")
 			}
 		case <-poolTicker.C:
 			counter++
 			metrics = agent.CollectGaudeMetrics()
 			metrics = append(metrics, m.Metric{MetricType: m.Gauge, MetricName: m.RandomValue, Value: rand.Float64()})
+			logger.Info().Interface("metrics", metrics).Msg("Metrics collected")
 
 		case <-ctx.Done():
 
