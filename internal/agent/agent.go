@@ -44,7 +44,7 @@ func SendMetric(ctx context.Context, client *http.Client, metrics []m.Metric, ad
 	wg := sync.WaitGroup{}
 
 	for _, element := range metrics {
-		wg.Add(len(metrics))
+		wg.Add(1)
 		go func(element m.Metric) {
 			defer wg.Done()
 			request := fmt.Sprintf("http://%s/update/%s/%s/%v", address, element.MetricType, element.MetricName, element.Value)
