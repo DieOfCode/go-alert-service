@@ -149,6 +149,7 @@ func (m *Handler) HandleGetJsonMetric(w http.ResponseWriter, r *http.Request) {
 	res, err := m.repository.GetMetricByName(metricType, metric.ID)
 	if err != nil {
 		// h.logger.Error().Err(err).Msg("GetMetric method error")
+		//
 		writeResponse(w, http.StatusNotFound, error.Error{Error: "Not found"})
 		return
 	}
