@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"github.com/DieOfCode/go-alert-service/internal/error"
 	"github.com/DieOfCode/go-alert-service/internal/metrics"
 	s "github.com/DieOfCode/go-alert-service/internal/storage"
 )
@@ -100,4 +102,77 @@ func (m *Handler) HandleGetAllMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+}
+
+func (m *Handler) HandleUpdateJsonMetric(w http.ResponseWriter, r *http.Request) {
+	var metric metrics.Metrics
+	if err := json.NewDecoder(r.Body).Decode(&metric); err != nil {
+		writeResponse(w, http.StatusBadRequest, error.Error{Error: "Bad request"})
+		return
+	}
+	var metricValue string
+	var metricType metrics.MetricType
+	if metric.MType == "gauge" {
+		metricType = metrics.Gauge
+		metricValue = fmt.Sprintf("%f", *metric.Value)
+	} else {
+		metricType = metrics.Counter
+		metricValue = fmt.Sprintf("%d", *metric.Delta)
+	}
+
+	if err := m.repository.UpdateMetric(metricType, metric.ID, metricValue); err != nil {
+		writeResponse(w, http.StatusInternalServerError, error.Error{Error: "Internal server error"})
+		return
+	}
+
+	writeResponse(w, http.StatusOK, metric)
+}
+
+func (m *Handler) HandleGetJsonMetric(w http.ResponseWriter, r *http.Request) {
+
+	// h.logger.Info().Any("req", r.Body).Msg("Request body")
+
+	var metric metrics.Metrics
+	if err := json.NewDecoder(r.Body).Decode(&metric); err != nil {
+		// h.logger.Error().Err(err).Msg("Invalid incoming data")
+		writeResponse(w, http.StatusBadRequest, error.Error{Error: "Bad request"})
+		return
+	}
+	// h.logger.Info().Any("req", metric).Msg("Decoded request body")
+
+	var metricType metrics.MetricType
+	if metric.MType == "gauge" {
+		metricType = metrics.Gauge
+	} else {
+		metricType = metrics.Counter
+	}
+	res, err := m.repository.GetMetricByName(metricType, metric.ID)
+	if err != nil {
+		// h.logger.Error().Err(err).Msg("GetMetric method error")
+		writeResponse(w, http.StatusNotFound, error.Error{Error: "Not found"})
+		return
+	}
+	var resultMetric metrics.Metrics
+
+	if metricType == metrics.Gauge {
+		value := res.Value.(float64)
+		resultMetric = metrics.Metrics{ID: metric.ID, MType: metric.MType, Value: &value}
+	} else {
+		value := res.Value.(int64)
+		resultMetric = metrics.Metrics{ID: metric.ID, MType: metric.MType, Delta: &value}
+	}
+
+	writeResponse(w, http.StatusOK, resultMetric)
+}
+
+func writeResponse(w http.ResponseWriter, code int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	b, err := json.Marshal(v)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"error": "Internal server error"}`))
+		return
+	}
+	w.WriteHeader(code)
+	w.Write(b)
 }

@@ -27,6 +27,8 @@ func main() {
 		r.MethodFunc(http.MethodPost, "/update/{type}/{name}/{value}", handler.HandleUpdateMetric)
 		r.MethodFunc(http.MethodGet, "/value/{type}/{name}", handler.HandleGetMetricByName)
 		r.MethodFunc(http.MethodGet, "/", handler.HandleGetAllMetrics)
+		r.MethodFunc(http.MethodPost, "/update/", handler.HandleUpdateJsonMetric)
+		r.MethodFunc(http.MethodPost, "/value", handler.HandleGetJsonMetric)
 	})
 
 	err := http.ListenAndServe(config.ServerAddress, router)
