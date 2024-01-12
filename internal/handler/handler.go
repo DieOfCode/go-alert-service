@@ -11,15 +11,18 @@ import (
 	"github.com/DieOfCode/go-alert-service/internal/error"
 	"github.com/DieOfCode/go-alert-service/internal/metrics"
 	s "github.com/DieOfCode/go-alert-service/internal/storage"
+	"github.com/rs/zerolog"
 )
 
 type Handler struct {
 	repository s.Repository
+	logger     zerolog.Logger
 }
 
-func NewHandler(repository s.Repository) *Handler {
+func NewHandler(repository s.Repository, logger zerolog.Logger) *Handler {
 	return &Handler{
 		repository: repository,
+		logger:     logger,
 	}
 }
 
@@ -104,9 +107,10 @@ func (m *Handler) HandleGetAllMetrics(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (m *Handler) HandleUpdateJsonMetric(w http.ResponseWriter, r *http.Request) {
+func (m *Handler) HandleUpdateJSONMetric(w http.ResponseWriter, r *http.Request) {
 	var metric metrics.Metrics
 	if err := json.NewDecoder(r.Body).Decode(&metric); err != nil {
+		m.logger.Error().Err(err).Msg("Invalid incoming data")
 		writeResponse(w, http.StatusBadRequest, error.Error{Error: "Bad request"})
 		return
 	}
@@ -121,6 +125,7 @@ func (m *Handler) HandleUpdateJsonMetric(w http.ResponseWriter, r *http.Request)
 	}
 
 	if err := m.repository.UpdateMetric(metricType, metric.ID, metricValue); err != nil {
+		m.logger.Error().Err(err).Msg("UpdateMetric method error")
 		writeResponse(w, http.StatusInternalServerError, error.Error{Error: "Internal server error"})
 		return
 	}
@@ -128,17 +133,17 @@ func (m *Handler) HandleUpdateJsonMetric(w http.ResponseWriter, r *http.Request)
 	writeResponse(w, http.StatusOK, metric)
 }
 
-func (m *Handler) HandleGetJsonMetric(w http.ResponseWriter, r *http.Request) {
+func (m *Handler) HandleGetJSONMetric(w http.ResponseWriter, r *http.Request) {
 
-	// h.logger.Info().Any("req", r.Body).Msg("Request body")
+	m.logger.Info().Any("req", r.Body).Msg("Request body")
 
 	var metric metrics.Metrics
 	if err := json.NewDecoder(r.Body).Decode(&metric); err != nil {
-		// h.logger.Error().Err(err).Msg("Invalid incoming data")
+		m.logger.Error().Err(err).Msg("Invalid incoming data")
 		writeResponse(w, http.StatusBadRequest, error.Error{Error: "Bad request"})
 		return
 	}
-	// h.logger.Info().Any("req", metric).Msg("Decoded request body")
+	m.logger.Info().Any("req", metric).Msg("Decoded request body")
 
 	var metricType metrics.MetricType
 	if metric.MType == "gauge" {
@@ -148,8 +153,7 @@ func (m *Handler) HandleGetJsonMetric(w http.ResponseWriter, r *http.Request) {
 	}
 	res, err := m.repository.GetMetricByName(metricType, metric.ID)
 	if err != nil {
-		// h.logger.Error().Err(err).Msg("GetMetric method error")
-		//
+		m.logger.Error().Err(err).Msg("GetMetricByName method error")
 		writeResponse(w, http.StatusNotFound, error.Error{Error: "Not found"})
 		return
 	}

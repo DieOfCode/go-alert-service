@@ -18,7 +18,7 @@ func main() {
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 	config := configuration.ServerConfiguration()
 	memStorage := storage.NewMemStorage()
-	handler := handler.NewHandler(memStorage)
+	handler := handler.NewHandler(memStorage, logger)
 
 	router := chi.NewRouter()
 	router.Route("/", func(r chi.Router) {
@@ -27,8 +27,8 @@ func main() {
 		r.MethodFunc(http.MethodPost, "/update/{type}/{name}/{value}", handler.HandleUpdateMetric)
 		r.MethodFunc(http.MethodGet, "/value/{type}/{name}", handler.HandleGetMetricByName)
 		r.MethodFunc(http.MethodGet, "/", handler.HandleGetAllMetrics)
-		r.MethodFunc(http.MethodPost, "/update/", handler.HandleUpdateJsonMetric)
-		r.MethodFunc(http.MethodPost, "/value/", handler.HandleGetJsonMetric)
+		r.MethodFunc(http.MethodPost, "/update/", handler.HandleUpdateJSONMetric)
+		r.MethodFunc(http.MethodPost, "/value/", handler.HandleGetJSONMetric)
 	})
 
 	err := http.ListenAndServe(config.ServerAddress, router)
