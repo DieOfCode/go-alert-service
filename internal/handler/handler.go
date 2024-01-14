@@ -37,6 +37,7 @@ func (m *Handler) HandleUpdateMetric(w http.ResponseWriter, r *http.Request) {
 	metricName := parts[1]
 	metricValue := parts[2]
 
+	m.logger.Info().Msgf("HANDLE UPDATE: %s  %s", metricType, metricName)
 	err := m.repository.UpdateMetric(metricType, metricName, metricValue)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -58,6 +59,7 @@ func (m *Handler) HandleGetMetricByName(w http.ResponseWriter, r *http.Request) 
 	metricType := parts[0]
 	metricName := parts[1]
 
+	m.logger.Info().Msgf("HANDLE GET: %s  %s", metricType, metricName)
 	metric, err := m.repository.GetMetricByName(metricType, metricName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)

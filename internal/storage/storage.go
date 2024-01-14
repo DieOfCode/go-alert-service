@@ -29,7 +29,7 @@ func (storage *MemStorage) UpdateMetric(metricType string, metricName string, va
 	storage.mu.Lock()
 	defer storage.mu.Unlock()
 
-	key := fmt.Sprintf("%s_%s", metricType, metricName)
+	key := metricName
 	fmt.Print("KEY\n")
 	fmt.Print(key)
 	switch metricType {
@@ -70,7 +70,7 @@ func (storage *MemStorage) UpdateMetric(metricType string, metricName string, va
 }
 
 func (storage *MemStorage) GetMetricByName(metricType string, metricName string) (metrics.Metrics, error) {
-	key := fmt.Sprintf("%s_%s", metricType, metricName)
+	key := metricName
 	metric, ok := storage.metrics[key]
 	if !ok {
 		return metrics.Metrics{}, fmt.Errorf("метрика с именем %s не найдена", key)
