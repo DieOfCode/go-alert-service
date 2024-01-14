@@ -62,7 +62,9 @@ func (agent *MetricAgent) SendMetric(ctx context.Context, client *http.Client, m
 	for _, element := range metrics {
 		wg.Add(1)
 		go func(element m.Metric) {
-			b, err := json.Marshal(element.ToMetrics())
+			rawValue := element.ToMetrics()
+			agent.logger.Info().Any("req", rawValue).Msg("Metrics to metric")
+			b, err := json.Marshal(rawValue)
 			if err != nil {
 				return
 			}
