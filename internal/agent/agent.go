@@ -77,7 +77,6 @@ func (agent *MetricAgent) SendMetric(ctx context.Context, client *http.Client, m
 			if err != nil {
 				return
 			}
-			println(n)
 			agent.logger.Info().Msgf("buffer's content: %v", buf.String())
 			gw.Close()
 
@@ -90,13 +89,14 @@ func (agent *MetricAgent) SendMetric(ctx context.Context, client *http.Client, m
 			request := fmt.Sprintf("http://%s/update/", address)
 			req, err := http.NewRequestWithContext(ctx, http.MethodPost, request, buf)
 			if err != nil {
-				log.Println(err)
+				agent.logger.Err(err)
 				return
 			}
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("Content-Encoding", "gzip")
 			resp, err := client.Do(req)
 			if err != nil {
+				agent.logger.Info().Msgf("buffer's content: %v", buf.String())
 				log.Println(err)
 				return
 			}
