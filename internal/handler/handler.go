@@ -131,6 +131,7 @@ func (m *Handler) HandleUpdateJSONMetric(w http.ResponseWriter, r *http.Request)
 	}
 
 	writeResponse(w, http.StatusOK, metric)
+	m.logger.Info().Any("req", r.Body).Any("MetricName", metric.ID).Any("MetricType", metric.MType).Any("MetricValue", metricValue).Any("GaudeValue", metric.Value).Msg("Success save metric")
 }
 
 func (m *Handler) HandleGetJSONMetric(w http.ResponseWriter, r *http.Request) {
@@ -168,6 +169,7 @@ func (m *Handler) HandleGetJSONMetric(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeResponse(w, http.StatusOK, resultMetric)
+	m.logger.Info().Any("req", r.Body).Any("MetricName", res.MetricName).Any("MetricValue", res.Value).Msg("Success get metric")
 }
 
 func writeResponse(w http.ResponseWriter, code int, v any) {
