@@ -1,12 +1,15 @@
 package handler
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/DieOfCode/go-alert-service/internal/error"
 	"github.com/DieOfCode/go-alert-service/internal/metrics"
@@ -182,4 +185,34 @@ func writeResponse(w http.ResponseWriter, code int, v any) {
 	}
 	w.WriteHeader(code)
 	w.Write(b)
+}
+
+func (handler *Handler) Decompress() func(next http.Handler) http.Handler {
+	pool := sync.Pool{
+		New: func() any { return new(gzip.Reader) },
+	}
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			encodingHeaders := r.Header.Values("Content-Encoding")
+			if !slices.Contains(encodingHeaders, "gzip") {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			gr, ok := pool.Get().(*gzip.Reader)
+			if !ok {
+				handler.logger.Error().Msg("Error to get Reader")
+			}
+			defer pool.Put(gr)
+
+			if err := gr.Reset(r.Body); err != nil {
+				handler.logger.Error().Err(err).Msg("Reset gr error")
+			}
+			defer gr.Close()
+
+			r.Body = gr
+			next.ServeHTTP(w, r)
+		})
+	}
 }

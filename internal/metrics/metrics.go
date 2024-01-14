@@ -18,6 +18,19 @@ type Metric struct {
 	Value      interface{}
 }
 
+func (metric *Metric) ToMetrics() Metrics {
+	id := metric.MetricName
+
+	if metric.MetricType == "gauge" {
+		value := metric.Value.(float64)
+		return Metrics{ID: id, Value: &value, MType: "gauge"}
+
+	} else {
+		value := metric.Value.(int64)
+		return Metrics{ID: id, Delta: &value, MType: "counter"}
+	}
+}
+
 type Metrics struct {
 	ID    string   `json:"id"`              // имя метрики
 	MType string   `json:"type"`            // параметр, принимающий значение gauge или counter

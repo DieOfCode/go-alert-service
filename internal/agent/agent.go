@@ -1,7 +1,10 @@
 package agent
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,11 +13,24 @@ import (
 	"sync"
 
 	m "github.com/DieOfCode/go-alert-service/internal/metrics"
+	"github.com/rs/zerolog"
 )
 
-// TODO replace with real metric type
+type Agent interface {
+	CollectGaudeMetrics() []m.Metric
+	SendMetric(ctx context.Context, client *http.Client, metrics []m.Metric, address string, pool *sync.Pool) error
+}
 
-func CollectGaudeMetrics() []m.Metric {
+type MetricAgent struct {
+	logger zerolog.Logger
+}
+
+func NewMetricAgent(logger zerolog.Logger) *MetricAgent {
+	return &MetricAgent{
+		logger: logger,
+	}
+}
+func (agent *MetricAgent) CollectGaudeMetrics() []m.Metric {
 	var collectedMerics []m.Metric
 	var stat runtime.MemStats
 
@@ -40,20 +56,45 @@ func CollectGaudeMetrics() []m.Metric {
 	return collectedMerics
 }
 
-func SendMetric(ctx context.Context, client *http.Client, metrics []m.Metric, address string) error {
+func (agent *MetricAgent) SendMetric(ctx context.Context, client *http.Client, metrics []m.Metric, address string, pool *sync.Pool) error {
 	wg := sync.WaitGroup{}
 
 	for _, element := range metrics {
 		wg.Add(1)
 		go func(element m.Metric) {
+			b, err := json.Marshal(element.ToMetrics())
+			if err != nil {
+				return
+			}
 			defer wg.Done()
-			request := fmt.Sprintf("http://%s/update/%s/%s/%v", address, element.MetricType, element.MetricName, element.Value)
-			req, err := http.NewRequestWithContext(ctx, http.MethodPost, request, nil)
+			buf := &bytes.Buffer{}
+			gw := pool.Get().(*gzip.Writer)
+			defer pool.Put(gw)
+			gw.Reset(buf)
+			agent.logger.Info().Msgf("buffer points to: %p", buf)
+			agent.logger.Info().Msgf("buffer's content: %v", buf.String())
+			n, err := gw.Write(b)
+			if err != nil {
+				return
+			}
+			println(n)
+			agent.logger.Info().Msgf("buffer's content: %v", buf.String())
+			gw.Close()
+
+			agent.logger.Info().
+				Int("len of b", len(b)).
+				Int("written bytes", n).
+				Int("len of buf", len(buf.Bytes())).
+				Send()
+
+			request := fmt.Sprintf("http://%s/update/", address)
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, request, buf)
 			if err != nil {
 				log.Println(err)
 				return
 			}
-			req.Header.Set("Content-Type", "text/plain")
+			req.Header.Add("Content-Type", "application/json")
+			req.Header.Add("Content-Encoding", "gzip")
 			resp, err := client.Do(req)
 			if err != nil {
 				log.Println(err)
