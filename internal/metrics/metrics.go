@@ -22,22 +22,29 @@ type Metric struct {
 
 func (metric *Metric) ToMetrics() Metrics {
 	id := metric.MetricName
-	value := metric.Value
+	v := metric.Value
 
-	if reflect.TypeOf(value).Kind() == reflect.Int64 {
+	if reflect.TypeOf(v).Kind() == reflect.Int64 {
 		// Extract the underlying int64 value
-		int64Value := reflect.ValueOf(value).Int()
+		int64Value := reflect.ValueOf(v).Int()
 		print(int64Value)
-	} else {
-		print("")
-	}
-	if metric.MetricType == "gauge" {
-		value := metric.Value.(reflect.Value).Float()
-		return Metrics{ID: id, Value: &value, MType: "gauge"}
+		if metric.MetricType == "gauge" {
+			value := metric.Value.(float64)
+			return Metrics{ID: id, Value: &value, MType: "gauge"}
 
+		} else {
+			value := metric.Value.(int64)
+			return Metrics{ID: id, Delta: &value, MType: "counter"}
+		}
 	} else {
-		value := metric.Value.(reflect.Value).Int()
-		return Metrics{ID: id, Delta: &value, MType: "counter"}
+		if metric.MetricType == "gauge" {
+			value := metric.Value.(float64)
+			return Metrics{ID: id, Value: &value, MType: "gauge"}
+
+		} else {
+			value := metric.Value.(int64)
+			return Metrics{ID: id, Delta: &value, MType: "counter"}
+		}
 	}
 }
 
