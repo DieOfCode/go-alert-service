@@ -31,8 +31,11 @@ func CollectGaudeMetrics() []m.Metrics {
 			continue
 		}
 
+		canFloat := memStatValue.FieldByName(metricName).CanFloat()
+		if !canFloat {
+			continue
+		}
 		value := memStatValue.FieldByName(metricName).Float()
-
 		collectedMerics = append(collectedMerics, m.Metrics{MType: m.Gauge, ID: fieldValue.Name, Value: &value})
 
 	}
