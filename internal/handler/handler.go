@@ -51,7 +51,7 @@ func (handler *Handler) HandleUpdateMetric(w http.ResponseWriter, r *http.Reques
 
 }
 
-func (m *Handler) HandleGetMetricByName(w http.ResponseWriter, r *http.Request) {
+func (handler *Handler) HandleGetMetricByName(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/value/"), "/")
 
 	if len(parts) != 2 {
@@ -61,7 +61,7 @@ func (m *Handler) HandleGetMetricByName(w http.ResponseWriter, r *http.Request) 
 	metricType := metrics.MetricType(parts[0])
 	metricName := parts[1]
 
-	metric, err := m.repository.GetMetricByName(metricType, metricName)
+	metric, err := handler.repository.GetMetricByName(metricType, metricName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
