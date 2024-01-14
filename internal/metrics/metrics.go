@@ -46,7 +46,7 @@ func (metric *Metric) ToMetrics() Metrics {
 			return Metrics{ID: id, Delta: &value, MType: "counter"}
 		}
 	}
-	return Metrics{}
+	return Metrics{ID: "Test"}
 }
 
 type Metrics struct {
