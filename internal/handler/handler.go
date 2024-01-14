@@ -117,6 +117,7 @@ func (handler *Handler) HandleUpdateJSONMetric(w http.ResponseWriter, r *http.Re
 		writeResponse(w, http.StatusBadRequest, error.Error{Error: "Bad request"})
 		return
 	}
+	handler.logger.Info().Any("req", metric).Msg("UPDATE Decoded request body")
 	var metricValue string
 	var metricType metrics.MetricType
 	if metric.MType == "gauge" {
