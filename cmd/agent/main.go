@@ -17,7 +17,7 @@ import (
 
 func main() {
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
-	var metrics []m.Metric
+	var metrics []m.Metrics
 	var counter int64
 	config := configuration.AgentConfiguration()
 	httpClient := &http.Client{
@@ -39,7 +39,7 @@ loop:
 	for {
 		select {
 		case <-reportTicker.C:
-			metrics = append(metrics, m.Metric{MetricType: m.Counter, MetricName: m.PoolCount, Value: counter})
+			metrics = append(metrics, m.Metrics{MType: m.Counter, ID: m.PoolCount, Delta: &counter})
 			err := agent.SendMetric(ctx, httpClient, metrics, config.ServerAddress)
 			if err != nil {
 				logger.Fatal().Err(err).Msg("Send metrics error")
@@ -49,7 +49,8 @@ loop:
 		case <-poolTicker.C:
 			counter++
 			metrics = agent.CollectGaudeMetrics()
-			metrics = append(metrics, m.Metric{MetricType: m.Gauge, MetricName: m.RandomValue, Value: rand.Float64()})
+			random := rand.Float64()
+			metrics = append(metrics, m.Metrics{MType: m.Gauge, ID: m.RandomValue, Value: &random})
 			logger.Info().Interface("metrics", metrics).Msg("Metrics collected")
 
 		case <-ctx.Done():

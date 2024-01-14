@@ -1,22 +1,14 @@
 package metrics
 
-type MetricType string
-
 const (
-	Gauge   MetricType = "gauge"
-	Counter MetricType = "counter"
+	Gauge   string = "gauge"
+	Counter string = "counter"
 )
 
 const (
 	PoolCount   string = "PollCount"
 	RandomValue string = "RandomValue"
 )
-
-type Metric struct {
-	MetricType MetricType
-	MetricName string
-	Value      interface{}
-}
 
 type Metrics struct {
 	ID    string   `json:"id"`              // имя метрики

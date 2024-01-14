@@ -33,7 +33,7 @@ func (m *Handler) HandleUpdateMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	metricType := metrics.MetricType(parts[0])
+	metricType := parts[0]
 	metricName := parts[1]
 	metricValue := parts[2]
 
@@ -55,7 +55,7 @@ func (m *Handler) HandleGetMetricByName(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Попытка передать запрос без имени метрики", http.StatusNotFound)
 		return
 	}
-	metricType := metrics.MetricType(parts[0])
+	metricType := parts[0]
 	metricName := parts[1]
 
 	metric, err := m.repository.GetMetricByName(metricType, metricName)
@@ -66,10 +66,10 @@ func (m *Handler) HandleGetMetricByName(w http.ResponseWriter, r *http.Request) 
 	print("МЕТРИКА ПОЛУЧЕНА")
 	w.Header().Set("Content-Type", "text/plain")
 	if metricType == metrics.Gauge {
-		w.Write([]byte(strconv.FormatFloat(metric.Value.(float64), 'f', -1, 64)))
+		w.Write([]byte(strconv.FormatFloat(*metric.Value, 'f', -1, 64)))
 	}
 	if metricType == metrics.Counter {
-		w.Write([]byte(fmt.Sprintf("%d", metric.Value.(int64))))
+		w.Write([]byte(fmt.Sprintf("%d", *metric.Delta)))
 	}
 	w.WriteHeader(http.StatusOK)
 
@@ -115,7 +115,7 @@ func (m *Handler) HandleUpdateJSONMetric(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var metricValue string
-	var metricType metrics.MetricType
+	var metricType string
 	if metric.MType == "gauge" {
 		metricType = metrics.Gauge
 		metricValue = strconv.FormatFloat(float64(*metric.Value), 'f', 10, 64)
@@ -146,7 +146,7 @@ func (m *Handler) HandleGetJSONMetric(w http.ResponseWriter, r *http.Request) {
 	}
 	m.logger.Info().Any("req", metric).Msg("Decoded request body")
 
-	var metricType metrics.MetricType
+	var metricType string
 	if metric.MType == "gauge" {
 		metricType = metrics.Gauge
 	} else {
@@ -161,15 +161,15 @@ func (m *Handler) HandleGetJSONMetric(w http.ResponseWriter, r *http.Request) {
 	var resultMetric metrics.Metrics
 
 	if metricType == metrics.Gauge {
-		value := res.Value.(float64)
-		resultMetric = metrics.Metrics{ID: metric.ID, MType: metric.MType, Value: &value}
+		value := res.Value
+		resultMetric = metrics.Metrics{ID: metric.ID, MType: metric.MType, Value: value}
 	} else {
-		value := res.Value.(int64)
-		resultMetric = metrics.Metrics{ID: metric.ID, MType: metric.MType, Delta: &value}
+		value := res.Delta
+		resultMetric = metrics.Metrics{ID: metric.ID, MType: metric.MType, Delta: value}
 	}
 
 	writeResponse(w, http.StatusOK, resultMetric)
-	m.logger.Info().Any("req", r.Body).Any("MetricName", res.MetricName).Any("MetricValue", res.Value).Msg("Success get metric")
+	m.logger.Info().Any("req", r.Body).Any("MetricName", res.ID).Any("MetricValue", res.Value).Msg("Success get metric")
 }
 
 func writeResponse(w http.ResponseWriter, code int, v any) {

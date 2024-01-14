@@ -10,22 +10,22 @@ import (
 
 type MemStorage struct {
 	mu      sync.Mutex
-	metrics map[string]metrics.Metric
+	metrics map[string]metrics.Metrics
 }
 
 type Repository interface {
-	UpdateMetric(metricType metrics.MetricType, metricName string, value string) error
-	GetMetricByName(metricType metrics.MetricType, metricName string) (metrics.Metric, error)
-	GetAllMetrics() []metrics.Metric
+	UpdateMetric(metricType string, metricName string, value string) error
+	GetMetricByName(metricType string, metricName string) (metrics.Metrics, error)
+	GetAllMetrics() []metrics.Metrics
 }
 
 func NewMemStorage() *MemStorage {
 	return &MemStorage{
-		metrics: make(map[string]metrics.Metric),
+		metrics: make(map[string]metrics.Metrics),
 	}
 }
 
-func (storage *MemStorage) UpdateMetric(metricType metrics.MetricType, metricName string, value string) error {
+func (storage *MemStorage) UpdateMetric(metricType string, metricName string, value string) error {
 	storage.mu.Lock()
 	defer storage.mu.Unlock()
 
@@ -35,7 +35,7 @@ func (storage *MemStorage) UpdateMetric(metricType metrics.MetricType, metricNam
 	switch metricType {
 	case metrics.Gauge:
 		if newValue, err := strconv.ParseFloat(value, 64); err == nil {
-			storage.metrics[key] = metrics.Metric{Value: newValue}
+			storage.metrics[key] = metrics.Metrics{Value: &newValue}
 		} else {
 			return fmt.Errorf("некорректное значение для типа counter: %v", value)
 
@@ -43,19 +43,20 @@ func (storage *MemStorage) UpdateMetric(metricType metrics.MetricType, metricNam
 
 	case metrics.Counter:
 		if existingMetric, ok := storage.metrics[key]; ok {
-			switch existingValue := existingMetric.Value.(type) {
-			case int64:
-				if newValue, err := strconv.ParseInt(value, 10, 64); err == nil {
-					storage.metrics[key] = metrics.Metric{Value: existingValue + newValue}
-				} else {
-					return fmt.Errorf("некорректное значение для типа counter: %v", value)
-				}
-			default:
-				return fmt.Errorf("некорректное предыдущее значение для типа counter: %v", existingMetric.Value)
+			existingValue := existingMetric.Delta
+			newValue, err := strconv.ParseInt(value, 10, 64)
+			if err != nil {
+				return fmt.Errorf("некорректное значение для типа counter: %v", value)
+
 			}
+
+			firstSum := *existingValue
+			updatedValue := firstSum + newValue
+			storage.metrics[key] = metrics.Metrics{Delta: &updatedValue}
+
 		} else {
 			if newValue, err := strconv.ParseInt(value, 10, 64); err == nil {
-				storage.metrics[key] = metrics.Metric{Value: newValue}
+				storage.metrics[key] = metrics.Metrics{Delta: &newValue}
 			} else {
 				return fmt.Errorf("некорректное значение для типа counter: %v", value)
 			}
@@ -68,21 +69,21 @@ func (storage *MemStorage) UpdateMetric(metricType metrics.MetricType, metricNam
 	return nil
 }
 
-func (storage *MemStorage) GetMetricByName(metricType metrics.MetricType, metricName string) (metrics.Metric, error) {
+func (storage *MemStorage) GetMetricByName(metricType string, metricName string) (metrics.Metrics, error) {
 	key := fmt.Sprintf("%s_%s", metricType, metricName)
 	metric, ok := storage.metrics[key]
 	if !ok {
-		return metrics.Metric{}, fmt.Errorf("метрика с именем %s не найдена", key)
+		return metrics.Metrics{}, fmt.Errorf("метрика с именем %s не найдена", key)
 	}
 	return metric, nil
 }
 
-func (storage *MemStorage) GetAllMetrics() []metrics.Metric {
+func (storage *MemStorage) GetAllMetrics() []metrics.Metrics {
 	return getAllValues(storage.metrics)
 }
 
-func getAllValues(metricsByName map[string]metrics.Metric) []metrics.Metric {
-	values := make([]metrics.Metric, len(metricsByName))
+func getAllValues(metricsByName map[string]metrics.Metrics) []metrics.Metrics {
+	values := make([]metrics.Metrics, len(metricsByName))
 
 	for _, value := range metricsByName {
 		values = append(values, value)

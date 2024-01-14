@@ -14,8 +14,8 @@ import (
 
 // TODO replace with real metric type
 
-func CollectGaudeMetrics() []m.Metric {
-	var collectedMerics []m.Metric
+func CollectGaudeMetrics() []m.Metrics {
+	var collectedMerics []m.Metrics
 	var stat runtime.MemStats
 
 	runtime.ReadMemStats(&stat)
@@ -31,23 +31,23 @@ func CollectGaudeMetrics() []m.Metric {
 			continue
 		}
 
-		value := memStatValue.FieldByName(metricName)
+		value := memStatValue.FieldByName(metricName).Float()
 
-		collectedMerics = append(collectedMerics, m.Metric{MetricType: m.Gauge, MetricName: fieldValue.Name, Value: value})
+		collectedMerics = append(collectedMerics, m.Metrics{MType: m.Gauge, ID: fieldValue.Name, Value: &value})
 
 	}
 
 	return collectedMerics
 }
 
-func SendMetric(ctx context.Context, client *http.Client, metrics []m.Metric, address string) error {
+func SendMetric(ctx context.Context, client *http.Client, metrics []m.Metrics, address string) error {
 	wg := sync.WaitGroup{}
 
 	for _, element := range metrics {
 		wg.Add(1)
-		go func(element m.Metric) {
+		go func(element m.Metrics) {
 			defer wg.Done()
-			request := fmt.Sprintf("http://%s/update/%s/%s/%v", address, element.MetricType, element.MetricName, element.Value)
+			request := fmt.Sprintf("http://%s/update/%s/%s/%v", address, element.MType, element.ID, element.Value)
 			req, err := http.NewRequestWithContext(ctx, http.MethodPost, request, nil)
 			if err != nil {
 				log.Println(err)
