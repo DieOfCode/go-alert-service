@@ -15,8 +15,8 @@ const (
 type Metric struct {
 	MetricType MetricType `json:"id"`
 	MetricName string     `json:"type"`
-	Value      *float64   `json:"delta,omitempty"`
-	Delta      *int64     `json:"value,omitempty"`
+	Value      *float64   `json:"value,omitempty"`
+	Delta      *int64     `json:"delta,omitempty"`
 }
 
 type Metrics struct {
