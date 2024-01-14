@@ -29,7 +29,7 @@ func NewHandler(repository s.Repository, logger zerolog.Logger) *Handler {
 	}
 }
 
-func (m *Handler) HandleUpdateMetric(w http.ResponseWriter, r *http.Request) {
+func (handler *Handler) HandleUpdateMetric(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/update/"), "/")
 	if len(parts) != 3 {
 		http.Error(w, "Попытка передать запрос без имени метрики", http.StatusNotFound)
@@ -40,7 +40,7 @@ func (m *Handler) HandleUpdateMetric(w http.ResponseWriter, r *http.Request) {
 	metricName := parts[1]
 	metricValue := parts[2]
 
-	err := m.repository.UpdateMetric(metricType, metricName, metricValue)
+	err := handler.repository.UpdateMetric(metricType, metricName, metricValue)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -78,7 +78,7 @@ func (m *Handler) HandleGetMetricByName(w http.ResponseWriter, r *http.Request) 
 
 }
 
-func (m *Handler) HandleGetAllMetrics(w http.ResponseWriter, r *http.Request) {
+func (handler *Handler) HandleGetAllMetrics(w http.ResponseWriter, r *http.Request) {
 	tmpl := `
 	<!DOCTYPE html>
 	<html>
@@ -101,7 +101,7 @@ func (m *Handler) HandleGetAllMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html")
 
-	err = template.Execute(w, m.repository.GetAllMetrics())
+	err = template.Execute(w, handler.repository.GetAllMetrics())
 
 	if err != nil {
 		http.Error(w, "Ошибка выполнения шаблона", http.StatusInternalServerError)
@@ -110,10 +110,10 @@ func (m *Handler) HandleGetAllMetrics(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (m *Handler) HandleUpdateJSONMetric(w http.ResponseWriter, r *http.Request) {
+func (handler *Handler) HandleUpdateJSONMetric(w http.ResponseWriter, r *http.Request) {
 	var metric metrics.Metrics
 	if err := json.NewDecoder(r.Body).Decode(&metric); err != nil {
-		m.logger.Error().Err(err).Msg("Invalid incoming data")
+		handler.logger.Error().Err(err).Msg("Invalid incoming data")
 		writeResponse(w, http.StatusBadRequest, error.Error{Error: "Bad request"})
 		return
 	}
@@ -127,27 +127,27 @@ func (m *Handler) HandleUpdateJSONMetric(w http.ResponseWriter, r *http.Request)
 		metricValue = fmt.Sprintf("%d", *metric.Delta)
 	}
 
-	if err := m.repository.UpdateMetric(metricType, metric.ID, metricValue); err != nil {
-		m.logger.Error().Err(err).Msg("UpdateMetric method error")
+	if err := handler.repository.UpdateMetric(metricType, metric.ID, metricValue); err != nil {
+		handler.logger.Error().Err(err).Msg("UpdateMetric method error")
 		writeResponse(w, http.StatusInternalServerError, error.Error{Error: "Internal server error"})
 		return
 	}
 
 	writeResponse(w, http.StatusOK, metric)
-	m.logger.Info().Any("req", r.Body).Any("MetricName", metric.ID).Any("MetricType", metric.MType).Any("MetricValue", metricValue).Any("GaudeValue", metric.Value).Msg("Success save metric")
+	handler.logger.Info().Any("req", r.Body).Any("MetricName", metric.ID).Any("MetricType", metric.MType).Any("MetricValue", metricValue).Any("GaudeValue", metric.Value).Msg("Success save metric")
 }
 
-func (m *Handler) HandleGetJSONMetric(w http.ResponseWriter, r *http.Request) {
+func (handler *Handler) HandleGetJSONMetric(w http.ResponseWriter, r *http.Request) {
 
-	m.logger.Info().Any("req", r.Body).Msg("Request body")
+	handler.logger.Info().Any("req", r.Body).Msg("Request body")
 
 	var metric metrics.Metrics
 	if err := json.NewDecoder(r.Body).Decode(&metric); err != nil {
-		m.logger.Error().Err(err).Msg("Invalid incoming data")
+		handler.logger.Error().Err(err).Msg("Invalid incoming data")
 		writeResponse(w, http.StatusBadRequest, error.Error{Error: "Bad request"})
 		return
 	}
-	m.logger.Info().Any("req", metric).Msg("Decoded request body")
+	handler.logger.Info().Any("req", metric).Msg("Decoded request body")
 
 	var metricType metrics.MetricType
 	if metric.MType == "gauge" {
@@ -155,9 +155,9 @@ func (m *Handler) HandleGetJSONMetric(w http.ResponseWriter, r *http.Request) {
 	} else {
 		metricType = metrics.Counter
 	}
-	res, err := m.repository.GetMetricByName(metricType, metric.ID)
+	res, err := handler.repository.GetMetricByName(metricType, metric.ID)
 	if err != nil {
-		m.logger.Error().Err(err).Msg("GetMetricByName method error")
+		handler.logger.Error().Err(err).Msg("GetMetricByName method error")
 		writeResponse(w, http.StatusNotFound, error.Error{Error: "Not found"})
 		return
 	}
@@ -172,7 +172,7 @@ func (m *Handler) HandleGetJSONMetric(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeResponse(w, http.StatusOK, resultMetric)
-	m.logger.Info().Any("req", r.Body).Any("MetricName", res.MetricName).Any("MetricValue", res.Value).Msg("Success get metric")
+	handler.logger.Info().Any("req", r.Body).Any("MetricName", res.MetricName).Any("MetricValue", res.Value).Msg("Success get metric")
 }
 
 func writeResponse(w http.ResponseWriter, code int, v any) {

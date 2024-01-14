@@ -22,14 +22,13 @@ func (metric *Metric) ToMetrics() Metrics {
 	id := metric.MetricName
 
 	if metric.MetricType == "gauge" {
-		//metric.Value.(float64)
-		value := 0.0
+
+		value := float64(0.0)
 		return Metrics{ID: id, Value: &value, MType: "gauge"}
 
 	} else {
-		// metric.Value.(int64)
-		value := int64(1)
-		return Metrics{ID: id, Delta: &value, MType: "counter"}
+		counter := int64(1)
+		return Metrics{ID: id, Delta: &counter, MType: "counter"}
 	}
 }
 
