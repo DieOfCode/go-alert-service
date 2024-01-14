@@ -6,11 +6,13 @@ import (
 	"sync"
 
 	"github.com/DieOfCode/go-alert-service/internal/metrics"
+	"github.com/rs/zerolog"
 )
 
 type MemStorage struct {
 	mu      sync.Mutex
 	metrics map[string]metrics.Metrics
+	logger  zerolog.Logger
 }
 
 type Repository interface {
@@ -19,9 +21,10 @@ type Repository interface {
 	GetAllMetrics() []metrics.Metrics
 }
 
-func NewMemStorage() *MemStorage {
+func NewMemStorage(logger zerolog.Logger) *MemStorage {
 	return &MemStorage{
 		metrics: make(map[string]metrics.Metrics),
+		logger:  logger,
 	}
 }
 
@@ -30,12 +33,11 @@ func (storage *MemStorage) UpdateMetric(metricType string, metricName string, va
 	defer storage.mu.Unlock()
 
 	key := metricName
-	fmt.Print("KEY\n")
-	fmt.Print(key)
 	switch metricType {
 	case metrics.Gauge:
 		if newValue, err := strconv.ParseFloat(value, 64); err == nil {
 			storage.metrics[key] = metrics.Metrics{Value: &newValue}
+			storage.logger.Info().Msgf("STORAGE GAUDE UPDATE: %s  %s  %s %v", metricType, metricName, key, newValue)
 		} else {
 			return fmt.Errorf("некорректное значение для типа counter: %v", value)
 
@@ -53,6 +55,8 @@ func (storage *MemStorage) UpdateMetric(metricType string, metricName string, va
 			firstSum := *existingValue
 			updatedValue := firstSum + newValue
 			storage.metrics[key] = metrics.Metrics{Delta: &updatedValue}
+
+			storage.logger.Info().Msgf("STORAGE COUNTER UPDATE: %s  %s  %s %v", metricType, metricName, key, updatedValue)
 
 		} else {
 			if newValue, err := strconv.ParseInt(value, 10, 64); err == nil {
