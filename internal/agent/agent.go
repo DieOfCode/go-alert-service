@@ -47,9 +47,9 @@ func (agent *MetricAgent) CollectGaudeMetrics() []m.Metric {
 			continue
 		}
 
-		value := memStatValue.FieldByName(metricName)
+		value := memStatValue.FieldByName(metricName).Float()
 
-		collectedMerics = append(collectedMerics, m.Metric{MetricType: m.Gauge, MetricName: fieldValue.Name, Value: value})
+		collectedMerics = append(collectedMerics, m.Metric{MetricType: m.Gauge, MetricName: fieldValue.Name, Value: &value})
 
 	}
 
@@ -62,9 +62,7 @@ func (agent *MetricAgent) SendMetric(ctx context.Context, client *http.Client, m
 	for _, element := range metrics {
 		wg.Add(1)
 		go func(element m.Metric) {
-			rawValue := element.ToMetrics()
-			agent.logger.Info().Any("req", rawValue).Msg("Metrics to metric")
-			b, err := json.Marshal(rawValue)
+			b, err := json.Marshal(element)
 			if err != nil {
 				return
 			}

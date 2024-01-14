@@ -38,7 +38,7 @@ func (storage *MemStorage) UpdateMetric(metricType metrics.MetricType, metricNam
 	switch metricType {
 	case metrics.Gauge:
 		if newValue, err := strconv.ParseFloat(value, 64); err == nil {
-			storage.metrics[key] = metrics.Metric{Value: newValue}
+			storage.metrics[key] = metrics.Metric{Value: &newValue}
 		} else {
 			storage.logger.Error().Msgf("некорректное значение для типа gaude: %v", value)
 			return fmt.Errorf("некорректное значение для типа gaude: %v", value)
@@ -47,23 +47,20 @@ func (storage *MemStorage) UpdateMetric(metricType metrics.MetricType, metricNam
 
 	case metrics.Counter:
 		if existingMetric, ok := storage.metrics[key]; ok {
-			switch existingValue := existingMetric.Value.(type) {
-			case int64:
-				if newValue, err := strconv.ParseInt(value, 10, 64); err == nil {
-					storage.metrics[key] = metrics.Metric{Value: existingValue + newValue}
-				} else {
-					storage.logger.Error().Msgf("некорректное значение для типа counter: %v", value)
+			existingValue := existingMetric.Delta
 
-					return fmt.Errorf("некорректное значение для типа counter: %v", value)
-				}
-			default:
-				storage.logger.Error().Msgf("некорректное значение для типа counter: %v", existingMetric.Value)
+			if newValue, err := strconv.ParseInt(value, 10, 64); err == nil {
+				result := *(existingValue) + newValue
+				storage.metrics[key] = metrics.Metric{Delta: &result}
+			} else {
+				storage.logger.Error().Msgf("некорректное значение для типа counter: %v", value)
 
-				return fmt.Errorf("некорректное предыдущее значение для типа counter: %v", existingMetric.Value)
+				return fmt.Errorf("некорректное значение для типа counter: %v", value)
 			}
+
 		} else {
 			if newValue, err := strconv.ParseInt(value, 10, 64); err == nil {
-				storage.metrics[key] = metrics.Metric{Value: newValue}
+				storage.metrics[key] = metrics.Metric{Delta: &newValue}
 			} else {
 				storage.logger.Error().Msgf("некорректное значение для типа counter: %v", value)
 

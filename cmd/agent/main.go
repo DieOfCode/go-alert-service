@@ -46,7 +46,7 @@ loop:
 	for {
 		select {
 		case <-reportTicker.C:
-			metrics = append(metrics, m.Metric{MetricType: m.Counter, MetricName: m.PoolCount, Value: counter})
+			metrics = append(metrics, m.Metric{MetricType: m.Counter, MetricName: m.PoolCount, Delta: &counter})
 			err := metricAgent.SendMetric(ctx, httpClient, metrics, config.ServerAddress, pool)
 			if err != nil {
 				logger.Fatal().Err(err).Msg("Send metrics error")
@@ -56,7 +56,8 @@ loop:
 		case <-poolTicker.C:
 			counter++
 			metrics = metricAgent.CollectGaudeMetrics()
-			metrics = append(metrics, m.Metric{MetricType: m.Gauge, MetricName: m.RandomValue, Value: rand.Float64()})
+			randValue := rand.Float64()
+			metrics = append(metrics, m.Metric{MetricType: m.Gauge, MetricName: m.RandomValue, Value: &randValue})
 			logger.Info().Interface("metrics", metrics).Msg("Metrics collected")
 
 		case <-ctx.Done():

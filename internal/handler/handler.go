@@ -69,10 +69,11 @@ func (handler *Handler) HandleGetMetricByName(w http.ResponseWriter, r *http.Req
 	print("МЕТРИКА ПОЛУЧЕНА")
 	w.Header().Set("Content-Type", "text/plain")
 	if metricType == metrics.Gauge {
-		w.Write([]byte(strconv.FormatFloat(metric.Value.(float64), 'f', -1, 64)))
+		value := metric.Value
+		w.Write([]byte(strconv.FormatFloat(*value, 'f', -1, 64)))
 	}
 	if metricType == metrics.Counter {
-		w.Write([]byte(fmt.Sprintf("%d", metric.Value.(int64))))
+		w.Write([]byte(fmt.Sprintf("%d", *metric.Delta)))
 	}
 	w.WriteHeader(http.StatusOK)
 
@@ -165,11 +166,11 @@ func (handler *Handler) HandleGetJSONMetric(w http.ResponseWriter, r *http.Reque
 	var resultMetric metrics.Metrics
 
 	if metricType == metrics.Gauge {
-		value := res.Value.(float64)
-		resultMetric = metrics.Metrics{ID: metric.ID, MType: metric.MType, Value: &value}
+		value := res.Value
+		resultMetric = metrics.Metrics{ID: metric.ID, MType: metric.MType, Value: value}
 	} else {
-		value := res.Value.(int64)
-		resultMetric = metrics.Metrics{ID: metric.ID, MType: metric.MType, Delta: &value}
+		value := res.Delta
+		resultMetric = metrics.Metrics{ID: metric.ID, MType: metric.MType, Delta: value}
 	}
 
 	writeResponse(w, http.StatusOK, resultMetric)

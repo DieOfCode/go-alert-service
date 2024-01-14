@@ -1,7 +1,5 @@
 package metrics
 
-import "reflect"
-
 type MetricType string
 
 const (
@@ -15,38 +13,10 @@ const (
 )
 
 type Metric struct {
-	MetricType MetricType
-	MetricName string
-	Value      interface{}
-}
-
-func (metric *Metric) ToMetrics() Metrics {
-	id := metric.MetricName
-	v := metric.Value
-
-	if reflect.TypeOf(v).Kind() == reflect.Int64 {
-		// Extract the underlying int64 value
-		int64Value := reflect.ValueOf(v).Int()
-		print(int64Value)
-		if metric.MetricType == "gauge" {
-			value := metric.Value.(float64)
-			return Metrics{ID: id, Value: &value, MType: "gauge"}
-
-		} else {
-			value := metric.Value.(int64)
-			return Metrics{ID: id, Delta: &value, MType: "counter"}
-		}
-	} else if reflect.TypeOf(v).Kind() == reflect.Float64 {
-		if metric.MetricType == "gauge" {
-			value := metric.Value.(float64)
-			return Metrics{ID: id, Value: &value, MType: "gauge"}
-
-		} else {
-			value := metric.Value.(int64)
-			return Metrics{ID: id, Delta: &value, MType: "counter"}
-		}
-	}
-	return Metrics{ID: "Test"}
+	MetricType MetricType `json:"id"`
+	MetricName string     `json:"type"`
+	Value      *float64   `json:"delta,omitempty"`
+	Delta      *int64     `json:"value,omitempty"`
 }
 
 type Metrics struct {
