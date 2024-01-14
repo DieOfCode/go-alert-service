@@ -22,7 +22,15 @@ type Metric struct {
 
 func (metric *Metric) ToMetrics() Metrics {
 	id := metric.MetricName
+	value := metric.Value
 
+	if reflect.TypeOf(value).Kind() == reflect.Int64 {
+		// Extract the underlying int64 value
+		int64Value := reflect.ValueOf(value).Int()
+		print(int64Value)
+	} else {
+		print("")
+	}
 	if metric.MetricType == "gauge" {
 		value := metric.Value.(reflect.Value).Float()
 		return Metrics{ID: id, Value: &value, MType: "gauge"}
