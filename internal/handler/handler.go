@@ -118,7 +118,7 @@ func (m *Handler) HandleUpdateJSONMetric(w http.ResponseWriter, r *http.Request)
 	var metricType metrics.MetricType
 	if metric.MType == "gauge" {
 		metricType = metrics.Gauge
-		metricValue = fmt.Sprintf("%f", *metric.Value)
+		metricValue = strconv.FormatFloat(float64(*metric.Value), 'f', 10, 64)
 	} else {
 		metricType = metrics.Counter
 		metricValue = fmt.Sprintf("%d", *metric.Delta)
