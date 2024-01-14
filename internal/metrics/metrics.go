@@ -1,5 +1,7 @@
 package metrics
 
+import "reflect"
+
 type MetricType string
 
 const (
@@ -22,11 +24,11 @@ func (metric *Metric) ToMetrics() Metrics {
 	id := metric.MetricName
 
 	if metric.MetricType == "gauge" {
-		value := metric.Value.(float64)
+		value := metric.Value.(reflect.Value).Float()
 		return Metrics{ID: id, Value: &value, MType: "gauge"}
 
 	} else {
-		value := metric.Value.(int64)
+		value := metric.Value.(reflect.Value).Int()
 		return Metrics{ID: id, Delta: &value, MType: "counter"}
 	}
 }
