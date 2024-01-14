@@ -6,11 +6,13 @@ import (
 	"sync"
 
 	"github.com/DieOfCode/go-alert-service/internal/metrics"
+	"github.com/rs/zerolog"
 )
 
 type MemStorage struct {
 	mu      sync.Mutex
 	metrics map[string]metrics.Metric
+	logger  zerolog.Logger
 }
 
 type Repository interface {
@@ -19,9 +21,10 @@ type Repository interface {
 	GetAllMetrics() []metrics.Metric
 }
 
-func NewMemStorage() *MemStorage {
+func NewMemStorage(logger zerolog.Logger) *MemStorage {
 	return &MemStorage{
 		metrics: make(map[string]metrics.Metric),
+		logger:  logger,
 	}
 }
 
@@ -37,7 +40,8 @@ func (storage *MemStorage) UpdateMetric(metricType metrics.MetricType, metricNam
 		if newValue, err := strconv.ParseFloat(value, 64); err == nil {
 			storage.metrics[key] = metrics.Metric{Value: newValue}
 		} else {
-			return fmt.Errorf("некорректное значение для типа counter: %v", value)
+			storage.logger.Error().Msgf("некорректное значение для типа gaude: %v", value)
+			return fmt.Errorf("некорректное значение для типа gaude: %v", value)
 
 		}
 
@@ -48,20 +52,28 @@ func (storage *MemStorage) UpdateMetric(metricType metrics.MetricType, metricNam
 				if newValue, err := strconv.ParseInt(value, 10, 64); err == nil {
 					storage.metrics[key] = metrics.Metric{Value: existingValue + newValue}
 				} else {
+					storage.logger.Error().Msgf("некорректное значение для типа counter: %v", value)
+
 					return fmt.Errorf("некорректное значение для типа counter: %v", value)
 				}
 			default:
+				storage.logger.Error().Msgf("некорректное значение для типа counter: %v", existingMetric.Value)
+
 				return fmt.Errorf("некорректное предыдущее значение для типа counter: %v", existingMetric.Value)
 			}
 		} else {
 			if newValue, err := strconv.ParseInt(value, 10, 64); err == nil {
 				storage.metrics[key] = metrics.Metric{Value: newValue}
 			} else {
+				storage.logger.Error().Msgf("некорректное значение для типа counter: %v", value)
+
 				return fmt.Errorf("некорректное значение для типа counter: %v", value)
 			}
 
 		}
 	default:
+		storage.logger.Error().Msgf("некорректный тип метрики: %s", metricType)
+
 		return fmt.Errorf("некорректный тип метрики: %s", metricType)
 	}
 

@@ -17,7 +17,7 @@ func main() {
 
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 	config := configuration.ServerConfiguration()
-	memStorage := storage.NewMemStorage()
+	memStorage := storage.NewMemStorage(logger)
 	handler := handler.NewHandler(memStorage, logger)
 
 	router := chi.NewRouter()
