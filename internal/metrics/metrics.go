@@ -36,7 +36,7 @@ func (metric *Metric) ToMetrics() Metrics {
 			value := metric.Value.(int64)
 			return Metrics{ID: id, Delta: &value, MType: "counter"}
 		}
-	} else {
+	} else if reflect.TypeOf(v).Kind() == reflect.Float64 {
 		if metric.MetricType == "gauge" {
 			value := metric.Value.(float64)
 			return Metrics{ID: id, Value: &value, MType: "gauge"}
@@ -46,6 +46,7 @@ func (metric *Metric) ToMetrics() Metrics {
 			return Metrics{ID: id, Delta: &value, MType: "counter"}
 		}
 	}
+	return Metrics{}
 }
 
 type Metrics struct {
