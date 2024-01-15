@@ -3,18 +3,32 @@ package agent
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"reflect"
 	"runtime"
 	"sync"
 
 	m "github.com/DieOfCode/go-alert-service/internal/metrics"
+	"github.com/rs/zerolog"
 )
 
-// TODO replace with real metric type
+type Agent interface {
+	CollectGaudeMetrics() []m.Metrics
+	SendMetric(ctx context.Context, client *http.Client, metrics []m.Metrics, address string) error
+}
 
-func CollectGaudeMetrics() []m.Metrics {
+type MetricsAgent struct {
+	//TODO: replace to loger interface
+	logger zerolog.Logger
+}
+
+func NewMetricsAgent(logger zerolog.Logger) *MetricsAgent {
+	return &MetricsAgent{
+		logger: logger,
+	}
+}
+
+func (metricAgent *MetricsAgent) CollectGaudeMetrics() []m.Metrics {
 	var collectedMerics []m.Metrics
 	var stat runtime.MemStats
 
@@ -43,7 +57,7 @@ func CollectGaudeMetrics() []m.Metrics {
 	return collectedMerics
 }
 
-func SendMetric(ctx context.Context, client *http.Client, metrics []m.Metrics, address string) error {
+func (metricAgent *MetricsAgent) SendMetric(ctx context.Context, client *http.Client, metrics []m.Metrics, address string) error {
 	wg := sync.WaitGroup{}
 
 	for _, element := range metrics {
@@ -53,13 +67,13 @@ func SendMetric(ctx context.Context, client *http.Client, metrics []m.Metrics, a
 			request := fmt.Sprintf("http://%s/update/%s/%s/%v", address, element.MType, element.ID, element.Value)
 			req, err := http.NewRequestWithContext(ctx, http.MethodPost, request, nil)
 			if err != nil {
-				log.Println(err)
+				metricAgent.logger.Err(err).Msgf("REQUEST CREATE ERROR")
 				return
 			}
 			req.Header.Set("Content-Type", "text/plain")
 			resp, err := client.Do(req)
 			if err != nil {
-				log.Println(err)
+				metricAgent.logger.Err(err).Msgf("UPDATE METRIC VALUE ERROR %s", element.ID)
 				return
 			}
 			resp.Body.Close()

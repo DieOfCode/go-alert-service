@@ -16,7 +16,8 @@ import (
 
 type Handler struct {
 	repository s.Repository
-	logger     zerolog.Logger
+	//TODO: replace to loger interface
+	logger zerolog.Logger
 }
 
 func NewHandler(repository s.Repository, logger zerolog.Logger) *Handler {

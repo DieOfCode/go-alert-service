@@ -39,6 +39,7 @@ func (storage *MemStorage) UpdateMetric(metricType string, metricName string, va
 			storage.metrics[key] = metrics.Metrics{Value: &newValue}
 			storage.logger.Info().Msgf("STORAGE GAUDE UPDATE: %s  %s  %s %v", metricType, metricName, key, newValue)
 		} else {
+			storage.logger.Error().Msgf("STORAGE GAUDE UPDATE ERROR: %s  %s  %s %v", metricType, metricName, key, newValue)
 			return fmt.Errorf("некорректное значение для типа counter: %v", value)
 
 		}
@@ -48,6 +49,8 @@ func (storage *MemStorage) UpdateMetric(metricType string, metricName string, va
 			existingValue := existingMetric.Delta
 			newValue, err := strconv.ParseInt(value, 10, 64)
 			if err != nil {
+				storage.logger.Error().Msgf("STORAGE COUNTER UPDATE ERROR: %s  %s  %s %v", metricType, metricName, key, newValue)
+
 				return fmt.Errorf("некорректное значение для типа counter: %v", value)
 
 			}
@@ -62,11 +65,13 @@ func (storage *MemStorage) UpdateMetric(metricType string, metricName string, va
 			if newValue, err := strconv.ParseInt(value, 10, 64); err == nil {
 				storage.metrics[key] = metrics.Metrics{Delta: &newValue}
 			} else {
+				storage.logger.Error().Msgf("STORAGE COUNTER UPDATE ERROR: %s  %s  %s %v", metricType, metricName, key, newValue)
 				return fmt.Errorf("некорректное значение для типа counter: %v", value)
 			}
 
 		}
 	default:
+		storage.logger.Error().Msgf("STORAGE COUNTER UPDATE ERROR: %s  %s  %s", metricType, metricName, key)
 		return fmt.Errorf("некорректный тип метрики: %s", metricType)
 	}
 
