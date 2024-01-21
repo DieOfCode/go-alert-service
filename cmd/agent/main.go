@@ -23,7 +23,7 @@ func main() {
 	httpClient := &http.Client{
 		Timeout: time.Minute,
 	}
-
+	metricAgent := agent.NewAgent(logger)
 	poolTicker := time.NewTicker(time.Duration(config.PollInterval) * time.Second)
 	reportTicker := time.NewTicker(time.Duration(config.ReportInterval) * time.Second)
 
@@ -40,7 +40,7 @@ loop:
 		select {
 		case <-reportTicker.C:
 			metrics = append(metrics, m.Metric{MetricType: m.Counter, MetricName: m.PoolCount, Value: counter})
-			err := agent.SendMetric(ctx, httpClient, metrics, config.ServerAddress)
+			err := metricAgent.SendMetric(ctx, httpClient, metrics, config.ServerAddress)
 			if err != nil {
 				logger.Fatal().Err(err).Msg("Send metrics error")
 			} else {
@@ -48,7 +48,7 @@ loop:
 			}
 		case <-poolTicker.C:
 			counter++
-			metrics = agent.CollectGaudeMetrics()
+			metrics = metricAgent.CollectGaudeMetrics()
 			metrics = append(metrics, m.Metric{MetricType: m.Gauge, MetricName: m.RandomValue, Value: rand.Float64()})
 			logger.Info().Interface("metrics", metrics).Msg("Metrics collected")
 

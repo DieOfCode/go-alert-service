@@ -10,11 +10,27 @@ import (
 	"sync"
 
 	m "github.com/DieOfCode/go-alert-service/internal/metrics"
+	"github.com/rs/zerolog"
 )
 
 // TODO replace with real metric type
 
-func CollectGaudeMetrics() []m.Metric {
+type Agent struct {
+	logger zerolog.Logger
+}
+
+type MetricAgent interface {
+	CollectGaudeMetrics() []m.Metric
+	SendMetric(ctx context.Context, client *http.Client, metrics []m.Metric, address string) error
+}
+
+func NewAgent(logger zerolog.Logger) *Agent {
+	return &Agent{
+		logger: logger,
+	}
+}
+
+func (agent *Agent) CollectGaudeMetrics() []m.Metric {
 	var collectedMerics []m.Metric
 	var stat runtime.MemStats
 
@@ -40,7 +56,7 @@ func CollectGaudeMetrics() []m.Metric {
 	return collectedMerics
 }
 
-func SendMetric(ctx context.Context, client *http.Client, metrics []m.Metric, address string) error {
+func (agent *Agent) SendMetric(ctx context.Context, client *http.Client, metrics []m.Metric, address string) error {
 	wg := sync.WaitGroup{}
 
 	for _, element := range metrics {
