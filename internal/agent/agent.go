@@ -64,7 +64,8 @@ func (metricAgent *MetricsAgent) SendMetric(ctx context.Context, client *http.Cl
 		wg.Add(1)
 		go func(element m.Metrics) {
 			defer wg.Done()
-			request := fmt.Sprintf("http://%s/update/%s/%s/%v", address, element.MType, element.ID, element.Value)
+			value := *element.Value
+			request := fmt.Sprintf("http://%s/update/%s/%s/%v", address, element.MType, element.ID, value)
 			req, err := http.NewRequestWithContext(ctx, http.MethodPost, request, nil)
 			if err != nil {
 				metricAgent.logger.Err(err).Msgf("REQUEST CREATE ERROR")
