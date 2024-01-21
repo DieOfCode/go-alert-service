@@ -59,9 +59,8 @@ func (metricAgent *MetricsAgent) CollectGaudeMetrics() []m.Metrics {
 
 func (metricAgent *MetricsAgent) SendMetric(ctx context.Context, client *http.Client, metrics []m.Metrics, address string) error {
 	wg := sync.WaitGroup{}
-
+	wg.Add(len(metrics))
 	for _, element := range metrics {
-		wg.Add(1)
 		go func(element m.Metrics) {
 			defer wg.Done()
 			metricType := element.MType
