@@ -51,7 +51,7 @@ func (storage *MemStorage) UpdateMetric(metricType string, metricName string, va
 			existingValue := existingMetric.Delta
 			newValue, err := strconv.ParseInt(value, 10, 64)
 			if err != nil {
-				storage.logger.Error().Msgf("STORAGE COUNTER UPDATE ERROR: %s  %s  %s %v", metricType, metricName, key, newValue)
+				storage.logger.Error().Msgf("STORAGE COUNTER UPDATE ERROR: %s  %s  %s %v %s", metricType, metricName, key, newValue, err.Error())
 
 				return fmt.Errorf("некорректное значение для типа counter: %v", value)
 

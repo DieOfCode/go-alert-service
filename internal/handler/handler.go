@@ -38,7 +38,7 @@ func (m *Handler) HandleUpdateMetric(w http.ResponseWriter, r *http.Request) {
 	metricName := parts[1]
 	metricValue := parts[2]
 
-	m.logger.Info().Msgf("HANDLE UPDATE: %s  %s", metricType, metricName)
+	m.logger.Info().Msgf("HANDLE UPDATE: %s  %s %s", metricType, metricName, metricValue)
 	err := m.repository.UpdateMetric(metricType, metricName, metricValue)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
