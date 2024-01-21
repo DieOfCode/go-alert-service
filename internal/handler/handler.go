@@ -28,6 +28,7 @@ func NewHandler(repository s.Repository, logger zerolog.Logger) *Handler {
 }
 
 func (m *Handler) HandleUpdateMetric(w http.ResponseWriter, r *http.Request) {
+
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/update/"), "/")
 	if len(parts) != 3 {
 		http.Error(w, "Попытка передать запрос без имени метрики", http.StatusNotFound)
@@ -38,7 +39,7 @@ func (m *Handler) HandleUpdateMetric(w http.ResponseWriter, r *http.Request) {
 	metricName := parts[1]
 	metricValue := parts[2]
 
-	m.logger.Info().Msgf("HANDLE UPDATE: %s  %s %s", metricType, metricName, metricValue)
+	m.logger.Info().Msgf("HANDLE UPDATE: %s  %s %s URL PATH:%s", metricType, metricName, metricValue, r.URL.Path)
 	err := m.repository.UpdateMetric(metricType, metricName, metricValue)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
