@@ -38,9 +38,10 @@ func (storage *MemStorage) UpdateMetric(metricType string, metricName string, va
 	case metrics.Gauge:
 		if newValue, err := strconv.ParseFloat(value, 64); err == nil {
 			storage.metrics[key] = metrics.Metrics{Value: &newValue}
+
 			storage.logger.Info().Msgf("STORAGE GAUDE UPDATE: %s  %s  %s %v", metricType, metricName, key, newValue)
 		} else {
-			storage.logger.Error().Msgf("STORAGE GAUDE UPDATE ERROR: %s  %s  %s %v", metricType, metricName, key, newValue)
+			storage.logger.Error().Msgf("STORAGE GAUDE UPDATE ERROR: %s  %s  %s %v %s", metricType, metricName, key, newValue, err.Error())
 			return fmt.Errorf("некорректное значение для типа counter: %v", value)
 
 		}
