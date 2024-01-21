@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"sync"
@@ -82,7 +83,8 @@ func (storage *MemStorage) GetMetricByName(metricType string, metricName string)
 	key := metricName
 	metric, ok := storage.metrics[key]
 	if !ok {
-		return metrics.Metrics{}, fmt.Errorf("метрика с именем %s не найдена", key)
+		jsonString, _ := json.Marshal(storage.metrics)
+		return metrics.Metrics{}, fmt.Errorf("метрика с именем %s не найдена %s", key, jsonString)
 	}
 	return metric, nil
 }
