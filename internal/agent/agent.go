@@ -64,8 +64,23 @@ func (metricAgent *MetricsAgent) SendMetric(ctx context.Context, client *http.Cl
 		wg.Add(1)
 		go func(element m.Metrics) {
 			defer wg.Done()
-			value := *element.Value
-			request := fmt.Sprintf("http://%s/update/%s/%s/%v", address, element.MType, element.ID, value)
+			metricType := element.MType
+			metricID := element.ID
+			var request string
+			if metricType == m.Gauge {
+				if element.Value != nil {
+					value := *element.Value
+					request = fmt.Sprintf("http://%s/update/%s/%s/%v", address, metricType, metricID, value)
+				} else {
+					request = fmt.Sprintf("http://%s/update/%s/%s", address, metricType, metricID)
+				}
+
+			} else {
+				value := *element.Delta
+				request = fmt.Sprintf("http://%s/update/%s/%s/%v", address, element.MType, metricID, value)
+
+			}
+
 			req, err := http.NewRequestWithContext(ctx, http.MethodPost, request, nil)
 			if err != nil {
 				metricAgent.logger.Err(err).Msgf("REQUEST CREATE ERROR")
