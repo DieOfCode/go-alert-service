@@ -3,27 +3,29 @@ package metrics
 type MetricType string
 
 const (
-	Gauge   MetricType = "gauge"
-	Counter MetricType = "counter"
+	TypeCounter = "counter"
+	TypeGauge   = "gauge"
 )
 
-const (
-	PoolCount   string = "PollCount"
-	RandomValue string = "RandomValue"
-)
+type AgentMetric struct {
+	MType string `json:"type"`
+	ID    string `json:"id"`
+	Value any    `json:"value,omitempty"`
+	Delta any    `json:"delta,omitempty"`
+}
 
 type Metric struct {
-	MetricType MetricType
-	MetricName string
-	Value      interface{}
+	ID    string   `json:"id"`
+	MType string   `json:"type"`
+	Delta *int64   `json:"delta,omitempty"`
+	Value *float64 `json:"value,omitempty"`
 }
 
-type Metrics struct {
-	ID    string   `json:"id"`              // имя метрики
-	MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
-	Delta *int64   `json:"delta,omitempty"` // значение метрики в случае передачи counter
-	Value *float64 `json:"value,omitempty"` // значение метрики в случае передачи gauge
+type Error struct {
+	Error string `json:"error"`
 }
+
+type Data map[string]map[string]Metric
 
 var GaugeMetrics = []string{
 	"MCacheSys", "MSpanInuse", "MSpanSys", "Mallocs", "NextGC", "NumForcedGC", "NumGC", "OtherSys",

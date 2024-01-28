@@ -1,9 +1,13 @@
 package agent
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/json"
 	"fmt"
-	"log"
+	"io"
+	"math/rand"
 	"net/http"
 	"reflect"
 	"runtime"
@@ -13,73 +17,98 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// TODO replace with real metric type
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
 
 type Agent struct {
-	logger zerolog.Logger
+	mu      sync.Mutex
+	logger  *zerolog.Logger
+	client  HTTPClient
+	Metrics []m.AgentMetric
+	address string
+	counter *int64
+	gw      *gzip.Writer
 }
 
-type MetricAgent interface {
-	CollectGaudeMetrics() []m.Metric
-	SendMetric(ctx context.Context, client *http.Client, metrics []m.Metric, address string) error
-}
-
-func NewAgent(logger zerolog.Logger) *Agent {
+func New(logger *zerolog.Logger, client HTTPClient, address string) *Agent {
+	counter := new(int64)
+	*counter = 0
 	return &Agent{
-		logger: logger,
+		logger:  logger,
+		client:  client,
+		address: address,
+		counter: counter,
+		gw:      gzip.NewWriter(io.Discard),
+		Metrics: make([]m.AgentMetric, len(m.GaugeMetrics)+2),
 	}
 }
 
-func (agent *Agent) CollectGaudeMetrics() []m.Metric {
-	var collectedMerics []m.Metric
-	var stat runtime.MemStats
+func (a *Agent) SendMetrics(ctx context.Context) {
+	wg := sync.WaitGroup{}
+	wg.Add(len(a.Metrics))
 
-	runtime.ReadMemStats(&stat)
+	for _, metric := range a.Metrics {
+		go func(metric m.AgentMetric) {
+			defer wg.Done()
+			b, err := json.Marshal(metric)
+			if err != nil {
+				a.logger.Error().Err(err).Msg("Marshalling error")
+				return
+			}
 
-	memStatValue := reflect.ValueOf(stat)
-	memStatType := memStatValue.Type()
+			buf := &bytes.Buffer{}
+			a.mu.Lock()
+			a.gw.Reset(buf)
+			n, err := a.gw.Write(b)
+			if err != nil {
+				a.logger.Error().Err(err).Msg("gw.Write error")
+				return
+			}
+			a.gw.Close()
+			a.mu.Unlock()
 
-	for _, metricName := range m.GaugeMetrics {
+			a.logger.Info().
+				Int("len of b", len(b)).
+				Int("written bytes", n).
+				Int("len of buf", len(buf.Bytes())).
+				Send()
 
-		fieldValue, success := memStatType.FieldByName(metricName)
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("http://%s/update/", a.address), buf)
+			if err != nil {
+				a.logger.Error().Err(err).Msg("http.NewRequestWithContext method error")
+				return
+			}
+			req.Header.Add("Content-Type", "application/json")
+			req.Header.Add("Content-Encoding", "gzip")
 
-		if !success {
+			res, err := a.client.Do(req)
+			if err != nil {
+				a.logger.Error().Err(err).Msg("client.Do method error")
+				return
+			}
+			res.Body.Close()
+			a.logger.Info().Any("metric", metric).Msg("Metric is sent")
+		}(metric)
+	}
+	wg.Wait()
+}
+
+func (a *Agent) CollectMetrics() {
+	*a.counter++
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+	msvalue := reflect.ValueOf(memStats)
+	mstype := msvalue.Type()
+
+	for index, metric := range m.GaugeMetrics {
+		field, ok := mstype.FieldByName(metric)
+		if !ok {
 			continue
 		}
-
-		value := memStatValue.FieldByName(metricName)
-
-		collectedMerics = append(collectedMerics, m.Metric{MetricType: m.Gauge, MetricName: fieldValue.Name, Value: value})
-
+		value := msvalue.FieldByName(metric).Interface()
+		a.Metrics[index] = m.AgentMetric{MType: m.TypeGauge, ID: field.Name, Value: value}
 	}
-
-	return collectedMerics
-}
-
-func (agent *Agent) SendMetric(ctx context.Context, client *http.Client, metrics []m.Metric, address string) error {
-	wg := sync.WaitGroup{}
-
-	for _, element := range metrics {
-		wg.Add(1)
-		go func(element m.Metric) {
-			defer wg.Done()
-			request := fmt.Sprintf("http://%s/update/%s/%s/%v", address, element.MetricType, element.MetricName, element.Value)
-			req, err := http.NewRequestWithContext(ctx, http.MethodPost, request, nil)
-			if err != nil {
-				log.Println(err)
-				return
-			}
-			req.Header.Set("Content-Type", "text/plain")
-			resp, err := client.Do(req)
-			if err != nil {
-				log.Println(err)
-				return
-			}
-			resp.Body.Close()
-		}(element)
-
-	}
-
-	wg.Wait()
-	return nil
+	a.Metrics[len(m.GaugeMetrics)] = m.AgentMetric{MType: m.TypeGauge, ID: "RandomValue", Value: rand.Float64()}
+	a.Metrics[len(m.GaugeMetrics)+1] = m.AgentMetric{MType: m.TypeCounter, ID: "PollCount", Delta: *a.counter}
 }
