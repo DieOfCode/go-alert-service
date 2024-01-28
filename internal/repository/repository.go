@@ -55,7 +55,7 @@ func (s *Service) SaveMetric(m metrics.Metric) error {
 		Str("type", m.MType).
 		Str("name", m.ID).
 		Logger()
-
+	print("Metric try to store")
 	if ok := s.repo.Store(m); !ok {
 		return ErrStoreData
 	}

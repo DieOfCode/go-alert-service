@@ -11,7 +11,7 @@ import (
 
 	"github.com/DieOfCode/go-alert-service/internal/metrics"
 	"github.com/DieOfCode/go-alert-service/internal/repository"
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
 )
 
@@ -156,6 +156,8 @@ func (h *PostMetric) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	mvalue := chi.URLParam(r, "value")
 
 	if mtype != metrics.TypeCounter && mtype != metrics.TypeGauge {
+		print(fmt.Sprintf("\n 1 ,%s", mtype))
+		print(fmt.Sprintf("\n 1.1 ,%s", r.URL.Path))
 		writeResponse(w, http.StatusBadRequest, metrics.Error{Error: "Bad request"})
 		return
 	}
@@ -166,6 +168,7 @@ func (h *PostMetric) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case metrics.TypeCounter:
 		delta, err := strconv.ParseInt(mvalue, 10, 0)
 		if err != nil {
+			print("\n\n 1")
 			writeResponse(w, http.StatusBadRequest, metrics.Error{Error: "Bad request"})
 			return
 		}
@@ -177,6 +180,7 @@ func (h *PostMetric) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case metrics.TypeGauge:
 		value, err := strconv.ParseFloat(mvalue, 64)
 		if err != nil {
+			print("\n\n 1")
 			writeResponse(w, http.StatusBadRequest, metrics.Error{Error: "Bad request"})
 			return
 		}
@@ -189,6 +193,7 @@ func (h *PostMetric) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.service.SaveMetric(m); err != nil {
 		if errors.Is(err, repository.ErrParseMetric) {
+			print("\n\n 1")
 			writeResponse(w, http.StatusBadRequest, metrics.Error{Error: "Bad request"})
 			return
 		}

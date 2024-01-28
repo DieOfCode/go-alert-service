@@ -95,6 +95,7 @@ func (s *MemStorage) Load(mtype, mname string) *metrics.Metric {
 }
 
 func (s *MemStorage) Store(m metrics.Metric) bool {
+	s.logger.Info().Interface("Start store", s.data).Send()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
