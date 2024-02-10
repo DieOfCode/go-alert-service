@@ -40,6 +40,7 @@ func main() {
 			logger.Fatal().Err(err).Msg("DB pinging error")
 		}
 	}
+	db.Ping()
 
 	storage := storage.New(&logger, *cfg.StoreInterval, cfg.FileStoragePath)
 	srv := repository.New(&logger, storage)
@@ -68,17 +69,17 @@ func main() {
 		r.Method(http.MethodGet, "/", getMetricsHandler)
 		r.Method(http.MethodPost, "/update/", postMetricV2Handler)
 		r.Method(http.MethodPost, "/value/", getMetricV2Handler)
-		r.Method(http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if db == nil {
-				return
-			}
-			if err := db.Ping(); err != nil {
-				logger.Error().Err(err).Msg("Pinging DB error")
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			w.WriteHeader(http.StatusOK)
-		}))
+		// r.Method(http.MethodGet, "/ping/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 	if db == nil {
+		// 		return
+		// 	}
+		// 	if err := db.Ping(); err != nil {
+		// 		logger.Error().Err(err).Msg("Pinging DB error")
+		// 		w.WriteHeader(http.StatusInternalServerError)
+		// 		return
+		// 	}
+		// 	w.WriteHeader(http.StatusOK)
+		// }))
 	})
 
 	server := http.Server{
