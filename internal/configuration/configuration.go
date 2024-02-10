@@ -20,7 +20,7 @@ func AgentConfiguration() *Config {
 	if err := env.Parse(&config); err != nil {
 		log.Fatal(err)
 	}
-
+	print("")
 	config.ServerAddress = orDefault(config.ServerAddress, address)
 	config.ReportInterval = orDefaultInt(config.ReportInterval, reportInterval)
 	config.PollInterval = orDefaultInt(config.PollInterval, poolInterval)
