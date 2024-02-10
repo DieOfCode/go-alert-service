@@ -4,14 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"sync"
 
 	"github.com/DieOfCode/go-alert-service/internal/metrics"
 	"github.com/rs/zerolog"
 )
 
 type MemStorage struct {
-	mu              sync.RWMutex
 	logger          *zerolog.Logger
 	data            metrics.Data
 	interval        int
@@ -70,14 +68,14 @@ func (s *MemStorage) WriteToFile() error {
 }
 
 func (s *MemStorage) LoadAll() metrics.Data {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	// s.mu.RLock()
+	// defer s.mu.RUnlock()
 	return s.data
 }
 
 func (s *MemStorage) Load(mtype, mname string) *metrics.Metric {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	// s.mu.RLock()
+	// defer s.mu.RUnlock()
 
 	metrics, ok := s.data[mtype]
 	if !ok {
@@ -96,8 +94,8 @@ func (s *MemStorage) Load(mtype, mname string) *metrics.Metric {
 
 func (s *MemStorage) Store(m metrics.Metric) bool {
 	s.logger.Info().Interface("Start store", s.data).Send()
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	// s.mu.Lock()
+	// defer s.mu.Unlock()
 
 	if s.interval == 0 {
 		defer func() {
