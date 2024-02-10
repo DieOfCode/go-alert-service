@@ -1,179 +1,243 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"html/template"
 	"net/http"
 	"strconv"
-	"strings"
+	"text/template"
 
-	"github.com/DieOfCode/go-alert-service/internal/error"
 	"github.com/DieOfCode/go-alert-service/internal/metrics"
-	s "github.com/DieOfCode/go-alert-service/internal/storage"
+	"github.com/DieOfCode/go-alert-service/internal/repository"
+	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
 )
 
-type Handler struct {
-	repository s.Repository
-	logger     zerolog.Logger
+type Service interface {
+	SaveMetric(m metrics.Metric) error
+	GetMetric(mtype, mname string) (*metrics.Metric, error)
+	GetMetrics() (metrics.Data, error)
 }
 
-func NewHandler(repository s.Repository, logger zerolog.Logger) *Handler {
-	return &Handler{
-		repository: repository,
-		logger:     logger,
+type GetMetric struct {
+	logger  *zerolog.Logger
+	service Service
+}
+
+func NewGetMetric(l *zerolog.Logger, srv Service) *GetMetric {
+	return &GetMetric{
+		logger:  l,
+		service: srv,
 	}
 }
 
-func (m *Handler) HandleUpdateMetric(w http.ResponseWriter, r *http.Request) {
-	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/update/"), "/")
-	if len(parts) != 3 {
-		http.Error(w, "Попытка передать запрос без имени метрики", http.StatusNotFound)
-		return
-	}
+func (h *GetMetric) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	mtype := chi.URLParam(r, "type")
+	mname := chi.URLParam(r, "name")
 
-	metricType := metrics.MetricType(parts[0])
-	metricName := parts[1]
-	metricValue := parts[2]
-
-	err := m.repository.UpdateMetric(metricType, metricName, metricValue)
+	metric, err := h.service.GetMetric(mtype, mname)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeResponse(w, http.StatusNotFound, metrics.Error{Error: "Not found"})
+		return
+	}
+	h.logger.Info().Any("metric", metric).Msg("Received metric from storage")
+
+	switch mtype {
+	case metrics.TypeGauge:
+		writeResponse(w, http.StatusOK, *metric.Value)
+	case metrics.TypeCounter:
+		writeResponse(w, http.StatusOK, *metric.Delta)
+	}
+}
+
+type GetMetricV2 struct {
+	logger  *zerolog.Logger
+	service Service
+}
+
+func NewGetMetricV2(l *zerolog.Logger, s Service) *GetMetricV2 {
+	return &GetMetricV2{
+		logger:  l,
+		service: s,
+	}
+}
+
+func (h *GetMetricV2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.logger.Info().Any("req", r.Body).Msg("Request body")
+
+	var req metrics.Metric
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error().Err(err).Msg("Invalid incoming data")
+		writeResponse(w, http.StatusBadRequest, metrics.Error{Error: "Bad request"})
+		return
+	}
+	h.logger.Info().Any("req", req).Msg("Decoded request body")
+
+	res, err := h.service.GetMetric(req.MType, req.ID)
+	if err != nil {
+		h.logger.Error().Err(err).Msg("GetMetric method error")
+		writeResponse(w, http.StatusNotFound, metrics.Error{Error: "Not found"})
 		return
 	}
 
+	writeResponse(w, http.StatusOK, res)
+}
+
+type GetMetrics struct {
+	logger  *zerolog.Logger
+	service Service
+}
+
+func NewGetMetrics(l *zerolog.Logger, srv Service) *GetMetrics {
+	return &GetMetrics{
+		logger:  l,
+		service: srv,
+	}
+}
+
+func (h *GetMetrics) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	allMetrics, err := h.service.GetMetrics()
+	if err != nil {
+		writeResponse(w, http.StatusInternalServerError, metrics.Error{Error: "Internal server error"})
+		return
+	}
+	h.logger.Info().Any("metrics", allMetrics).Msg("Received metrics from storage")
+
+	tmpl, err := template.New("metrics").Parse(HTMLTemplateString)
+	if err != nil {
+		writeResponse(w, http.StatusInternalServerError, metrics.Error{Error: "Internal server error"})
+		return
+	}
+	buf := bytes.Buffer{}
+	if err := tmpl.Execute(&buf, allMetrics); err != nil {
+		writeResponse(w, http.StatusInternalServerError, metrics.Error{Error: "Internal server error"})
+		return
+	}
+
+	w.Header().Add("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, "Метрика успешно обновлена")
-
+	w.Write(buf.Bytes())
 }
 
-func (m *Handler) HandleGetMetricByName(w http.ResponseWriter, r *http.Request) {
-	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/value/"), "/")
+const HTMLTemplateString = `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Metrics</title>
+</head>
+<body>
+    <h1>Metrics</h1>
+    <ul>
+    {{range .}}{{range .}}
+        <li>ID: {{.ID}}, Value: {{.Value}}, Delta: {{.Delta}}</li>
+    {{end}}{{end}}
+    </ul>
+</body>
+</html>
+`
 
-	if len(parts) != 2 {
-		http.Error(w, "Попытка передать запрос без имени метрики", http.StatusNotFound)
-		return
-	}
-	metricType := metrics.MetricType(parts[0])
-	metricName := parts[1]
-
-	metric, err := m.repository.GetMetricByName(metricType, metricName)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-	print("МЕТРИКА ПОЛУЧЕНА")
-	w.Header().Set("Content-Type", "text/plain")
-	if metricType == metrics.Gauge {
-		w.Write([]byte(strconv.FormatFloat(metric.Value.(float64), 'f', -1, 64)))
-	}
-	if metricType == metrics.Counter {
-		w.Write([]byte(fmt.Sprintf("%d", metric.Value.(int64))))
-	}
-	w.WriteHeader(http.StatusOK)
-
+type PostMetric struct {
+	logger  *zerolog.Logger
+	service Service
 }
 
-func (m *Handler) HandleGetAllMetrics(w http.ResponseWriter, r *http.Request) {
-	tmpl := `
-	<!DOCTYPE html>
-	<html>
-	<head>
-		<title>Metrics list</title>
-	</head>
-	<body>
-		<h1>Metrics list</h1>
-		<ul>
-		{{range $name, $metric := .Metrics}}
-			<li>{{$name}}: {{$metric.Value}}</li>
-		{{end}}
-		</ul>
-	</body>
-	</html>`
-	template, err := template.New("metrics").Parse(tmpl)
-	if err != nil {
-		http.Error(w, "Ошибка создания шаблона", http.StatusInternalServerError)
-		return
+func NewPostMetric(l *zerolog.Logger, srv Service) *PostMetric {
+	return &PostMetric{
+		logger:  l,
+		service: srv,
 	}
-	w.Header().Set("Content-Type", "text/html")
-
-	err = template.Execute(w, m.repository.GetAllMetrics())
-
-	if err != nil {
-		http.Error(w, "Ошибка выполнения шаблона", http.StatusInternalServerError)
-		return
-	}
-
 }
 
-func (m *Handler) HandleUpdateJSONMetric(w http.ResponseWriter, r *http.Request) {
-	var metric metrics.Metrics
-	if err := json.NewDecoder(r.Body).Decode(&metric); err != nil {
-		m.logger.Error().Err(err).Msg("Invalid incoming data")
-		writeResponse(w, http.StatusBadRequest, error.Error{Error: "Bad request"})
-		return
-	}
-	var metricValue string
-	var metricType metrics.MetricType
-	if metric.MType == "gauge" {
-		metricType = metrics.Gauge
-		metricValue = strconv.FormatFloat(float64(*metric.Value), 'f', 10, 64)
-	} else {
-		metricType = metrics.Counter
-		metricValue = fmt.Sprintf("%d", *metric.Delta)
-	}
+func (h *PostMetric) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	mtype := chi.URLParam(r, "type")
+	mname := chi.URLParam(r, "name")
+	mvalue := chi.URLParam(r, "value")
 
-	if err := m.repository.UpdateMetric(metricType, metric.ID, metricValue); err != nil {
-		m.logger.Error().Err(err).Msg("UpdateMetric method error")
-		writeResponse(w, http.StatusInternalServerError, error.Error{Error: "Internal server error"})
+	if mtype != metrics.TypeCounter && mtype != metrics.TypeGauge {
+		print(fmt.Sprintf("\n 1 ,%s", mtype))
+		print(fmt.Sprintf("\n 1.1 ,%s", r.URL.Path))
+		writeResponse(w, http.StatusBadRequest, metrics.Error{Error: "Bad request"})
 		return
 	}
 
-	writeResponse(w, http.StatusOK, metric)
-	m.logger.Info().Any("req", r.Body).Any("MetricName", metric.ID).Any("MetricType", metric.MType).Any("MetricValue", metricValue).Any("GaudeValue", metric.Value).Msg("Success save metric")
+	var m metrics.Metric
+
+	switch mtype {
+	case metrics.TypeCounter:
+		delta, err := strconv.ParseInt(mvalue, 10, 0)
+		if err != nil {
+			print("\n\n 1")
+			writeResponse(w, http.StatusBadRequest, metrics.Error{Error: "Bad request"})
+			return
+		}
+		m = metrics.Metric{
+			ID:    mname,
+			MType: mtype,
+			Delta: &delta,
+		}
+	case metrics.TypeGauge:
+		value, err := strconv.ParseFloat(mvalue, 64)
+		if err != nil {
+			print("\n\n 1")
+			writeResponse(w, http.StatusBadRequest, metrics.Error{Error: "Bad request"})
+			return
+		}
+		m = metrics.Metric{
+			ID:    mname,
+			MType: mtype,
+			Value: &value,
+		}
+	}
+
+	if err := h.service.SaveMetric(m); err != nil {
+		if errors.Is(err, repository.ErrParseMetric) {
+			print("\n\n 1")
+			writeResponse(w, http.StatusBadRequest, metrics.Error{Error: "Bad request"})
+			return
+		}
+		writeResponse(w, http.StatusInternalServerError, metrics.Error{Error: "Internal server error"})
+		return
+	}
+
+	writeResponse(w, http.StatusOK, fmt.Sprintf("metric %s of type %s with value %v has been set successfully", mname, mtype, mvalue))
 }
 
-func (m *Handler) HandleGetJSONMetric(w http.ResponseWriter, r *http.Request) {
+type PostMetricV2 struct {
+	logger  *zerolog.Logger
+	service Service
+}
 
-	m.logger.Info().Any("req", r.Body).Msg("Request body")
+func NewPostMetricV2(l *zerolog.Logger, srv Service) *PostMetricV2 {
+	return &PostMetricV2{
+		logger:  l,
+		service: srv,
+	}
+}
 
-	var metric metrics.Metrics
-	if err := json.NewDecoder(r.Body).Decode(&metric); err != nil {
-		m.logger.Error().Err(err).Msg("Invalid incoming data")
-		writeResponse(w, http.StatusBadRequest, error.Error{Error: "Bad request"})
+func (h *PostMetricV2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.logger.Info().Any("req", r.Body).Msg("Request body")
+
+	var req metrics.Metric
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error().Err(err).Msg("Invalid incoming data")
+		writeResponse(w, http.StatusBadRequest, metrics.Error{Error: "Bad request"})
 		return
 	}
-	m.logger.Info().Any("req", metric).Msg("Decoded request body")
+	h.logger.Info().Any("req", req).Msg("Decoded request body")
 
-	var metricType metrics.MetricType
-	if metric.MType == "gauge" {
-		metricType = metrics.Gauge
-	} else {
-		metricType = metrics.Counter
-	}
-	res, err := m.repository.GetMetricByName(metricType, metric.ID)
-	if err != nil {
-		m.logger.Error().Err(err).Msg("GetMetricByName method error")
-		writeResponse(w, http.StatusNotFound, error.Error{Error: "Not found"})
+	if err := h.service.SaveMetric(req); err != nil {
+		h.logger.Error().Err(err).Msg("SaveMetric method error")
+		writeResponse(w, http.StatusInternalServerError, metrics.Error{Error: "Internal server error"})
 		return
 	}
-	var resultMetric metrics.Metrics
 
-	if metricType == metrics.Gauge {
-		value := res.Value.(float64)
-		resultMetric = metrics.Metrics{ID: metric.ID, MType: metric.MType, Value: &value}
-	} else {
-		value := res.Value.(int64)
-		resultMetric = metrics.Metrics{ID: metric.ID, MType: metric.MType, Delta: &value}
-	}
-
-	writeResponse(w, http.StatusOK, resultMetric)
-	m.logger.Info().Any("req", r.Body).Any("MetricName", res.MetricName).Any("MetricValue", res.Value).Msg("Success get metric")
+	writeResponse(w, http.StatusOK, req)
 }
 
 func writeResponse(w http.ResponseWriter, code int, v any) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Add("Content-Type", "application/json")
 	b, err := json.Marshal(v)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
