@@ -1,91 +1,133 @@
 package storage
 
 import (
-	"fmt"
-	"strconv"
+	"encoding/json"
+	"errors"
+	"os"
 	"sync"
 
 	"github.com/DieOfCode/go-alert-service/internal/metrics"
+	"github.com/rs/zerolog"
 )
 
 type MemStorage struct {
-	mu      sync.Mutex
-	metrics map[string]metrics.Metric
+	mu              sync.RWMutex
+	logger          *zerolog.Logger
+	data            metrics.Data
+	interval        int
+	storageFileName string
 }
 
-type Repository interface {
-	UpdateMetric(metricType metrics.MetricType, metricName string, value string) error
-	GetMetricByName(metricType metrics.MetricType, metricName string) (metrics.Metric, error)
-	GetAllMetrics() []metrics.Metric
-}
-
-func NewMemStorage() *MemStorage {
+func New(logger *zerolog.Logger, interval int, file string) *MemStorage {
 	return &MemStorage{
-		metrics: make(map[string]metrics.Metric),
+		logger:          logger,
+		interval:        interval,
+		storageFileName: file,
+		data:            make(metrics.Data),
 	}
 }
 
-func (storage *MemStorage) UpdateMetric(metricType metrics.MetricType, metricName string, value string) error {
-	storage.mu.Lock()
-	defer storage.mu.Unlock()
-
-	key := fmt.Sprintf("%s_%s", metricType, metricName)
-	fmt.Print("KEY\n")
-	fmt.Print(key)
-	switch metricType {
-	case metrics.Gauge:
-		if newValue, err := strconv.ParseFloat(value, 64); err == nil {
-			storage.metrics[key] = metrics.Metric{Value: newValue}
-		} else {
-			return fmt.Errorf("некорректное значение для типа counter: %v", value)
-
-		}
-
-	case metrics.Counter:
-		if existingMetric, ok := storage.metrics[key]; ok {
-			switch existingValue := existingMetric.Value.(type) {
-			case int64:
-				if newValue, err := strconv.ParseInt(value, 10, 64); err == nil {
-					storage.metrics[key] = metrics.Metric{Value: existingValue + newValue}
-				} else {
-					return fmt.Errorf("некорректное значение для типа counter: %v", value)
-				}
-			default:
-				return fmt.Errorf("некорректное предыдущее значение для типа counter: %v", existingMetric.Value)
-			}
-		} else {
-			if newValue, err := strconv.ParseInt(value, 10, 64); err == nil {
-				storage.metrics[key] = metrics.Metric{Value: newValue}
-			} else {
-				return fmt.Errorf("некорректное значение для типа counter: %v", value)
-			}
-
-		}
-	default:
-		return fmt.Errorf("некорректный тип метрики: %s", metricType)
+func (s *MemStorage) RestoreFromFile() error {
+	_, err := os.Stat(s.storageFileName)
+	if errors.Is(err, os.ErrNotExist) {
+		return os.ErrNotExist
+	}
+	if err != nil {
+		return err
+	}
+	b, err := os.ReadFile(s.storageFileName)
+	if err != nil {
+		return err
 	}
 
+	if err := json.Unmarshal(b, &s.data); err != nil {
+		return err
+	}
+	s.logger.Info().Msgf("RestoreFromFile: %+v", s.data)
 	return nil
 }
 
-func (storage *MemStorage) GetMetricByName(metricType metrics.MetricType, metricName string) (metrics.Metric, error) {
-	key := fmt.Sprintf("%s_%s", metricType, metricName)
-	metric, ok := storage.metrics[key]
+func (s *MemStorage) WriteToFile() error {
+	file, err := os.OpenFile(s.storageFileName, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	s.logger.Info().Msg("File successfully opened")
+
+	b, err := json.MarshalIndent(s.data, "", "  ")
+	if err != nil {
+		return err
+	}
+	s.logger.Info().Msgf("Data successfully marshalled: %v", string(b))
+
+	n, err := file.Write(b)
+	if err != nil {
+		return err
+	}
+	s.logger.Info().Msgf("%d bytes were written to the file", n)
+	return nil
+}
+
+func (s *MemStorage) LoadAll() metrics.Data {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.data
+}
+
+func (s *MemStorage) Load(mtype, mname string) *metrics.Metric {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	metrics, ok := s.data[mtype]
 	if !ok {
-		return metrics.Metric{}, fmt.Errorf("метрика с именем %s не найдена", key)
+		s.logger.Info().Msgf("Metric type %s doesn't exist", mtype)
+		return nil
 	}
-	return metric, nil
+
+	mvalue, ok := metrics[mname]
+	if !ok {
+		s.logger.Info().Msgf("Metric %v doesn't exist", mvalue)
+		return nil
+	}
+
+	return &mvalue
 }
 
-func (storage *MemStorage) GetAllMetrics() []metrics.Metric {
-	return getAllValues(storage.metrics)
-}
+func (s *MemStorage) Store(m metrics.Metric) bool {
+	s.logger.Info().Interface("Start store", s.data).Send()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-func getAllValues(metricsByName map[string]metrics.Metric) []metrics.Metric {
-	values := make([]metrics.Metric, len(metricsByName))
-
-	for _, value := range metricsByName {
-		values = append(values, value)
+	if s.interval == 0 {
+		defer func() {
+			if err := s.WriteToFile(); err != nil {
+				s.logger.Error().Err(err).Msg("Failed to write storage content to file")
+			}
+		}()
 	}
-	return values
+
+	metric, ok := s.data[m.MType]
+	if !ok {
+		s.data[m.MType] = map[string]metrics.Metric{
+			m.ID: {ID: m.ID, MType: m.MType, Value: m.Value, Delta: m.Delta},
+		}
+		return true
+	}
+
+	switch m.MType {
+	case metrics.TypeGauge:
+		metric[m.ID] = metrics.Metric{ID: m.ID, MType: m.MType, Value: m.Value}
+	case metrics.TypeCounter:
+		selectedMetric, ok := metric[m.ID]
+		if !ok {
+			metric[m.ID] = metrics.Metric{ID: m.ID, MType: m.MType, Delta: m.Delta}
+			return true
+		}
+		*selectedMetric.Delta += *m.Delta
+		metric[m.ID] = metrics.Metric{ID: m.ID, MType: m.MType, Delta: selectedMetric.Delta}
+	}
+	s.logger.Info().Interface("Storage content", s.data).Send()
+
+	return true
 }
