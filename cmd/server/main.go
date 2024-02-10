@@ -41,7 +41,7 @@ func main() {
 		}
 		logger.Info().Msg("Storage has been restored from file")
 	}
-
+	print("1")
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
 		r.Use(middleware.RequestLogger(&handler.LogFormatter{Logger: &logger}))
