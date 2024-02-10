@@ -45,12 +45,12 @@ func New(logger *zerolog.Logger, client HTTPClient, address string) *Agent {
 }
 
 func (a *Agent) SendMetrics(ctx context.Context) {
-	wg := sync.WaitGroup{}
-	wg.Add(len(a.Metrics))
+	// wg := sync.WaitGroup{}
+	// wg.Add(len(a.Metrics))
 
 	for _, metric := range a.Metrics {
 		go func(metric m.AgentMetric) {
-			defer wg.Done()
+			// defer wg.Done()
 			b, err := json.Marshal(metric)
 			if err != nil {
 				a.logger.Error().Err(err).Msg("Marshalling error")
@@ -91,7 +91,7 @@ func (a *Agent) SendMetrics(ctx context.Context) {
 			a.logger.Info().Any("metric", metric).Msg("Metric is sent")
 		}(metric)
 	}
-	wg.Wait()
+	// wg.Wait()
 }
 
 func (a *Agent) CollectMetrics() {
