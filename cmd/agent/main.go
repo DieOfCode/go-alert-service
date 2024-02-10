@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,53 +10,46 @@ import (
 
 	"github.com/DieOfCode/go-alert-service/internal/agent"
 	"github.com/DieOfCode/go-alert-service/internal/configuration"
-	m "github.com/DieOfCode/go-alert-service/internal/metrics"
 	"github.com/rs/zerolog"
 )
 
 func main() {
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
-	var metrics []m.Metric
-	var counter int64
-	config := configuration.AgentConfiguration()
-	httpClient := &http.Client{
+
+	cfg, err := configuration.NewAgent()
+	if err != nil {
+		logger.Fatal().Err(err).Msg("Configuration error")
+	}
+	poll := time.NewTicker(time.Duration(cfg.PollInterval) * time.Second)
+	report := time.NewTicker(time.Duration(cfg.ReportInterval) * time.Second)
+	client := &http.Client{
 		Timeout: time.Minute,
 	}
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGKILL, syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
 
-	poolTicker := time.NewTicker(time.Duration(config.PollInterval) * time.Second)
-	reportTicker := time.NewTicker(time.Duration(config.ReportInterval) * time.Second)
-
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGKILL, syscall.SIGTERM, syscall.SIGINT)
-	defer cancel()
+	a := agent.New(&logger, client, cfg.ServerAddress)
 
 	logger.Info().
-		Int("pollInterval", config.PollInterval).
-		Int("reportInterval", config.ReportInterval).
+		Int("pollInterval", cfg.PollInterval).
+		Int("reportInterval", cfg.ReportInterval).
 		Msg("Started collecting metrics")
 
 loop:
 	for {
 		select {
-		case <-reportTicker.C:
-			metrics = append(metrics, m.Metric{MetricType: m.Counter, MetricName: m.PoolCount, Value: counter})
-			err := agent.SendMetric(ctx, httpClient, metrics, config.ServerAddress)
-			if err != nil {
-				logger.Fatal().Err(err).Msg("Send metrics error")
-			} else {
-				logger.Info().Interface("metrics", metrics).Msg("Metrics sent")
-			}
-		case <-poolTicker.C:
-			counter++
-			metrics = agent.CollectGaudeMetrics()
-			metrics = append(metrics, m.Metric{MetricType: m.Gauge, MetricName: m.RandomValue, Value: rand.Float64()})
-			logger.Info().Interface("metrics", metrics).Msg("Metrics collected")
-
+		case <-poll.C:
+			a.CollectMetrics()
+			logger.Info().Interface("metrics", a.Metrics).Msg("Metrics collected")
+		case <-report.C:
+			a.SendMetrics(ctx)
+			logger.Info().Interface("metrics", a.Metrics).Msg("Metrics sent")
 		case <-ctx.Done():
-
-			poolTicker.Stop()
-			reportTicker.Stop()
+			logger.Info().Err(ctx.Err()).Send()
+			poll.Stop()
+			report.Stop()
 			break loop
 		}
 	}
-
+	logger.Info().Msg("Finished collecting metrics")
 }
