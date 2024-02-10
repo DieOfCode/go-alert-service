@@ -13,6 +13,7 @@ type Config struct {
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	Restore         *bool  `env:"RESTORE"`
 	StoreInterval   *int   `env:"STORE_INTERVAL"`
+	DatabaseDNS     string `env:"DATABASE_DSN"`
 }
 
 func NewAgent() (*Config, error) {
@@ -37,7 +38,7 @@ func NewAgent() (*Config, error) {
 }
 
 func NewServer() (*Config, error) {
-	srvAddr, fileStoragePath, restore, storeInterval := parseServerFlags()
+	srvAddr, fileStoragePath, restore, storeInterval, serverDNS := parseServerFlags()
 
 	config := Config{}
 	if err := env.Parse(&config); err != nil {
@@ -56,6 +57,9 @@ func NewServer() (*Config, error) {
 	if config.FileStoragePath == "" {
 		config.FileStoragePath = fileStoragePath
 	}
+	if config.DatabaseDNS == "" {
+		config.DatabaseDNS = serverDNS
+	}
 
 	return &config, nil
 }
@@ -69,12 +73,13 @@ func parseAgentFlags() (string, int, int) {
 	return *serverAddress, *reportInterval, *pollInterval
 }
 
-func parseServerFlags() (string, string, bool, int) {
+func parseServerFlags() (string, string, bool, int, string) {
 	serverAddress := flag.String("a", "localhost:8080", "address and port to run server")
 	fileStoragePath := flag.String("f", "/tmp/metrics-db.json", "file storage path")
 	restore := flag.Bool("r", true, "restore")
 	storeInterval := flag.Int("i", 300, "interval")
+	databaseDSN := flag.String("d", "", "database DSN")
 	flag.Parse()
 
-	return *serverAddress, *fileStoragePath, *restore, *storeInterval
+	return *serverAddress, *fileStoragePath, *restore, *storeInterval, *databaseDSN
 }
