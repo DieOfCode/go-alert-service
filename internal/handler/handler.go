@@ -21,19 +21,20 @@ type Service interface {
 	GetMetrics() (metrics.Data, error)
 }
 
-type GetMetric struct {
+type MetricHandler struct {
 	logger  *zerolog.Logger
 	service Service
 }
 
-func NewGetMetric(l *zerolog.Logger, srv Service) *GetMetric {
-	return &GetMetric{
+func NewMetricHandler(l *zerolog.Logger, srv Service) *MetricHandler {
+	return &MetricHandler{
 		logger:  l,
 		service: srv,
 	}
 }
 
-func (h *GetMetric) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+// get metric
+func (h *MetricHandler) GetMetricByName(w http.ResponseWriter, r *http.Request) {
 	mtype := chi.URLParam(r, "type")
 	mname := chi.URLParam(r, "name")
 
@@ -52,19 +53,8 @@ func (h *GetMetric) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type GetMetricV2 struct {
-	logger  *zerolog.Logger
-	service Service
-}
-
-func NewGetMetricV2(l *zerolog.Logger, s Service) *GetMetricV2 {
-	return &GetMetricV2{
-		logger:  l,
-		service: s,
-	}
-}
-
-func (h *GetMetricV2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+// get metric with json
+func (h *MetricHandler) GetMetricByNameWithJson(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info().Any("req", r.Body).Msg("Request body")
 
 	var req metrics.Metric
@@ -85,19 +75,8 @@ func (h *GetMetricV2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, http.StatusOK, res)
 }
 
-type GetMetrics struct {
-	logger  *zerolog.Logger
-	service Service
-}
-
-func NewGetMetrics(l *zerolog.Logger, srv Service) *GetMetrics {
-	return &GetMetrics{
-		logger:  l,
-		service: srv,
-	}
-}
-
-func (h *GetMetrics) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+// get all metrics
+func (h *MetricHandler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 	allMetrics, err := h.service.GetMetrics()
 	if err != nil {
 		writeResponse(w, http.StatusInternalServerError, metrics.Error{Error: "Internal server error"})
@@ -138,19 +117,8 @@ const HTMLTemplateString = `
 </html>
 `
 
-type PostMetric struct {
-	logger  *zerolog.Logger
-	service Service
-}
-
-func NewPostMetric(l *zerolog.Logger, srv Service) *PostMetric {
-	return &PostMetric{
-		logger:  l,
-		service: srv,
-	}
-}
-
-func (h *PostMetric) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+// post metric
+func (h *MetricHandler) SaveMetric(w http.ResponseWriter, r *http.Request) {
 	mtype := chi.URLParam(r, "type")
 	mname := chi.URLParam(r, "name")
 	mvalue := chi.URLParam(r, "value")
@@ -204,19 +172,8 @@ func (h *PostMetric) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, http.StatusOK, fmt.Sprintf("metric %s of type %s with value %v has been set successfully", mname, mtype, mvalue))
 }
 
-type PostMetricV2 struct {
-	logger  *zerolog.Logger
-	service Service
-}
-
-func NewPostMetricV2(l *zerolog.Logger, srv Service) *PostMetricV2 {
-	return &PostMetricV2{
-		logger:  l,
-		service: srv,
-	}
-}
-
-func (h *PostMetricV2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+// post metric with json
+func (h *MetricHandler) SaveMetricWithJson(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info().Any("req", r.Body).Msg("Request body")
 
 	var req metrics.Metric

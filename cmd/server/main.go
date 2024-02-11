@@ -42,12 +42,8 @@ func main() {
 	}
 
 	storage := storage.New(&logger, *cfg.StoreInterval, cfg.FileStoragePath)
-	srv := repository.New(&logger, storage)
-	getMetricHandler := handler.NewGetMetric(&logger, srv)
-	getMetricsHandler := handler.NewGetMetrics(&logger, srv)
-	getMetricV2Handler := handler.NewGetMetricV2(&logger, srv)
-	postMetricHandler := handler.NewPostMetric(&logger, srv)
-	postMetricV2Handler := handler.NewPostMetricV2(&logger, srv)
+	repository := repository.New(&logger, storage)
+	metricHandler := handler.NewMetricHandler(&logger, repository)
 
 	if *cfg.Restore {
 		err := storage.RestoreFromFile()
@@ -63,11 +59,11 @@ func main() {
 		r.Use(middleware.Compress(5, "text/html", "application/json"))
 		r.Use(handler.Decompress(&logger))
 		r.Use(middleware.Recoverer)
-		r.Method(http.MethodPost, "/update/{type}/{name}/{value}", postMetricHandler)
-		r.Method(http.MethodGet, "/value/{type}/{name}", getMetricHandler)
-		r.Method(http.MethodGet, "/", getMetricsHandler)
-		r.Method(http.MethodPost, "/update/", postMetricV2Handler)
-		r.Method(http.MethodPost, "/value/", getMetricV2Handler)
+		r.MethodFunc(http.MethodPost, "/update/{type}/{name}/{value}", metricHandler.SaveMetric)
+		r.MethodFunc(http.MethodGet, "/value/{type}/{name}", metricHandler.GetMetricByName)
+		r.MethodFunc(http.MethodGet, "/", metricHandler.GetAllMetrics)
+		r.MethodFunc(http.MethodPost, "/update/", metricHandler.SaveMetricWithJson)
+		r.MethodFunc(http.MethodPost, "/value/", metricHandler.GetMetricByNameWithJson)
 		r.Method(http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if db == nil {
 				return
