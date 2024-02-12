@@ -86,7 +86,7 @@ func main() {
 		r.MethodFunc(http.MethodPost, "/update/", metricHandler.SaveMetricWithJSON)
 		r.MethodFunc(http.MethodPost, "/updates/", metricHandler.SaveMetricsWithJSON)
 		r.MethodFunc(http.MethodPost, "/value/", metricHandler.GetMetricByNameWithJSON)
-		r.Method(http.MethodGet, "/ping", DBPing(&logger, db))
+		r.Method(http.MethodGet, "/ping/", DBPing(&logger, db))
 	})
 
 	server := http.Server{
