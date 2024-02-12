@@ -131,3 +131,14 @@ func (s *MemStorage) Store(m metrics.Metric) bool {
 
 	return true
 }
+
+func (s *MemStorage) StoreMetrics(metrics []metrics.Metric) bool {
+	var stored bool
+	for _, metric := range metrics {
+		stored = s.Store(metric)
+		if !stored {
+			return false
+		}
+	}
+	return true
+}

@@ -17,6 +17,7 @@ import (
 
 type Service interface {
 	SaveMetric(m metrics.Metric) error
+	SaveMetrics(m []metrics.Metric) error
 	GetMetric(mtype, mname string) (*metrics.Metric, error)
 	GetMetrics() (metrics.Data, error)
 }
@@ -27,6 +28,7 @@ type MetricHandler interface {
 	GetAllMetrics(w http.ResponseWriter, r *http.Request)
 	SaveMetric(w http.ResponseWriter, r *http.Request)
 	SaveMetricWithJson(w http.ResponseWriter, r *http.Request)
+	SaveMetricsWithJson(w http.ResponseWriter, r *http.Request)
 }
 
 type Handler struct {
@@ -101,6 +103,7 @@ func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 	if err := tmpl.Execute(&buf, allMetrics); err != nil {
 		writeResponse(w, http.StatusInternalServerError, metrics.Error{Error: "Internal server error"})
 		return
+
 	}
 
 	w.Header().Add("Content-Type", "text/html")
@@ -193,6 +196,24 @@ func (h *Handler) SaveMetricWithJson(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info().Any("req", req).Msg("Decoded request body")
 
 	if err := h.service.SaveMetric(req); err != nil {
+		h.logger.Error().Err(err).Msg("SaveMetric method error")
+		writeResponse(w, http.StatusInternalServerError, metrics.Error{Error: "Internal server error"})
+		return
+	}
+
+	writeResponse(w, http.StatusOK, req)
+}
+
+func (h *Handler) SaveMetricsWithJson(w http.ResponseWriter, r *http.Request) {
+	var req []metrics.Metric
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.logger.Error().Err(err).Msg("Invalid incoming data")
+		writeResponse(w, http.StatusBadRequest, metrics.Error{Error: "Bad request"})
+		return
+	}
+	h.logger.Info().Any("req", req).Msg("Decoded request body")
+
+	if err := h.service.SaveMetrics(req); err != nil {
 		h.logger.Error().Err(err).Msg("SaveMetric method error")
 		writeResponse(w, http.StatusInternalServerError, metrics.Error{Error: "Internal server error"})
 		return

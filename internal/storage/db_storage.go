@@ -66,6 +66,17 @@ func (storage *DatabaseStorage) LoadAll() metrics.Data {
 	return result
 }
 
+func (db *DatabaseStorage) StoreMetrics(metrics []metrics.Metric) bool {
+	var stored bool
+	for _, metric := range metrics {
+		stored = db.Store(metric)
+		if !stored {
+			return false
+		}
+	}
+	return true
+}
+
 func (storage *DatabaseStorage) Load(mtype, mname string) *metrics.Metric {
 	var mID, mType string
 	var mValue sql.NullFloat64
