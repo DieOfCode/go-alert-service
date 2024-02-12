@@ -37,12 +37,12 @@ func NewAgent() (*Config, error) {
 	return &config, nil
 }
 
-func NewServer() (*Config, error) {
+func NewServer() (Config, error) {
 	flags := parseServerFlags()
 
 	config := Config{}
 	if err := env.Parse(&config); err != nil {
-		return nil, err
+		return Config{}, err
 	}
 
 	if config.ServerAddress == "" {
@@ -58,10 +58,12 @@ func NewServer() (*Config, error) {
 		config.FileStoragePath = flags.FileStoragePath
 	}
 	if config.DatabaseDNS == "" {
-		config.DatabaseDNS = flags.DatabaseDNS
+		config.FileStoragePath = ""
+		*config.StoreInterval = -1
+		*config.Restore = false
 	}
 
-	return &config, nil
+	return config, nil
 }
 
 func parseAgentFlags() Config {

@@ -32,7 +32,7 @@ func main() {
 	}
 
 	var db *sql.DB
-
+	logger.Info().Msg(cfg.DatabaseDNS)
 	if cfg.DatabaseDNS != "" {
 		db, err = sql.Open("pgx", cfg.DatabaseDNS)
 		if err != nil {
