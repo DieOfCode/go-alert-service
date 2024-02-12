@@ -24,11 +24,11 @@ type Service interface {
 
 type MetricHandler interface {
 	GetMetricByName(w http.ResponseWriter, r *http.Request)
-	GetMetricByNameWithJson(w http.ResponseWriter, r *http.Request)
+	GetMetricByNameWithJSON(w http.ResponseWriter, r *http.Request)
 	GetAllMetrics(w http.ResponseWriter, r *http.Request)
 	SaveMetric(w http.ResponseWriter, r *http.Request)
-	SaveMetricWithJson(w http.ResponseWriter, r *http.Request)
-	SaveMetricsWithJson(w http.ResponseWriter, r *http.Request)
+	SaveMetricWithJSON(w http.ResponseWriter, r *http.Request)
+	SaveMetricsWithJSON(w http.ResponseWriter, r *http.Request)
 }
 
 type Handler struct {
@@ -64,7 +64,7 @@ func (h *Handler) GetMetricByName(w http.ResponseWriter, r *http.Request) {
 }
 
 // get metric with json
-func (h *Handler) GetMetricByNameWithJson(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetMetricByNameWithJSON(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info().Any("req", r.Body).Msg("Request body")
 
 	var req metrics.Metric
@@ -184,7 +184,7 @@ func (h *Handler) SaveMetric(w http.ResponseWriter, r *http.Request) {
 }
 
 // post metric with json
-func (h *Handler) SaveMetricWithJson(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SaveMetricWithJSON(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info().Any("req", r.Body).Msg("Request body")
 
 	var req metrics.Metric
@@ -204,7 +204,7 @@ func (h *Handler) SaveMetricWithJson(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, http.StatusOK, req)
 }
 
-func (h *Handler) SaveMetricsWithJson(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SaveMetricsWithJSON(w http.ResponseWriter, r *http.Request) {
 	var req []metrics.Metric
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Error().Err(err).Msg("Invalid incoming data")

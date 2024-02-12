@@ -66,10 +66,10 @@ func (storage *DatabaseStorage) LoadAll() metrics.Data {
 	return result
 }
 
-func (db *DatabaseStorage) StoreMetrics(metrics []metrics.Metric) bool {
+func (storage *DatabaseStorage) StoreMetrics(metrics []metrics.Metric) bool {
 	var stored bool
 	for _, metric := range metrics {
-		stored = db.Store(metric)
+		stored = storage.Store(metric)
 		if !stored {
 			return false
 		}
