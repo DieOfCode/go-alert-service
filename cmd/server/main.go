@@ -86,17 +86,7 @@ func main() {
 		r.MethodFunc(http.MethodPost, "/update/", metricHandler.SaveMetricWithJSON)
 		r.MethodFunc(http.MethodPost, "/updates/", metricHandler.SaveMetricsWithJSON)
 		r.MethodFunc(http.MethodPost, "/value/", metricHandler.GetMetricByNameWithJSON)
-		r.Method(http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if db == nil {
-				return
-			}
-			if err := db.Ping(); err != nil {
-				logger.Error().Err(err).Msg("Pinging DB error")
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			w.WriteHeader(http.StatusOK)
-		}))
+		r.Method(http.MethodGet, "/ping", DBPing(&logger, db))
 	})
 
 	server := http.Server{
@@ -148,4 +138,19 @@ func main() {
 	}
 
 	logger.Info().Msg("Server stopped gracefully")
+}
+
+func DBPing(logger *zerolog.Logger, db *sql.DB) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logger.Info().Msg("Start DB PIMG")
+		if db == nil {
+			return
+		}
+		if err := db.Ping(); err != nil {
+			logger.Error().Err(err).Msg("Pinging DB error")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
 }
