@@ -58,9 +58,10 @@ func main() {
 
 	var storage repository.Storage
 	if cfg.DatabaseDNS == "" {
+		storage = s.NewMemStorage(&logger, *cfg.StoreInterval, cfg.FileStoragePath)
 
 	} else {
-		storage = s.NewMemStorage(&logger, *cfg.StoreInterval, cfg.FileStoragePath)
+		storage = s.NewDatabaseStorage(&logger, db)
 	}
 	repository := repository.New(&logger, storage)
 	metricHandler := handler.NewMetricHandler(&logger, repository)
