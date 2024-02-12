@@ -83,9 +83,9 @@ func main() {
 		r.MethodFunc(http.MethodPost, "/update/{type}/{name}/{value}", metricHandler.SaveMetric)
 		r.MethodFunc(http.MethodGet, "/value/{type}/{name}", metricHandler.GetMetricByName)
 		r.MethodFunc(http.MethodGet, "/", metricHandler.GetAllMetrics)
-		r.MethodFunc(http.MethodPost, "/update/", metricHandler.SaveMetricWithJson)
-		r.MethodFunc(http.MethodPost, "/updates/", metricHandler.SaveMetricsWithJson)
-		r.MethodFunc(http.MethodPost, "/value/", metricHandler.GetMetricByNameWithJson)
+		r.MethodFunc(http.MethodPost, "/update/", metricHandler.SaveMetricWithJSON)
+		r.MethodFunc(http.MethodPost, "/updates/", metricHandler.SaveMetricsWithJSON)
+		r.MethodFunc(http.MethodPost, "/value/", metricHandler.GetMetricByNameWithJSON)
 		r.Method(http.MethodGet, "/ping", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if db == nil {
 				return
