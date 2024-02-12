@@ -12,12 +12,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/golang-migrate/migrate"
+	"github.com/golang-migrate/migrate/database/postgres"
 	"github.com/rs/zerolog"
 
 	"github.com/DieOfCode/go-alert-service/internal/configuration"
 	"github.com/DieOfCode/go-alert-service/internal/handler"
 	"github.com/DieOfCode/go-alert-service/internal/repository"
-	"github.com/DieOfCode/go-alert-service/internal/storage"
+	s "github.com/DieOfCode/go-alert-service/internal/storage"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -30,8 +32,9 @@ func main() {
 	}
 
 	var db *sql.DB
+
 	if cfg.DatabaseDNS != "" {
-		db, err := sql.Open("pgx", cfg.DatabaseDNS)
+		db, err = sql.Open("pgx", cfg.DatabaseDNS)
 		if err != nil {
 			logger.Fatal().Err(err).Msg("DB initializing error")
 		}
@@ -39,9 +42,26 @@ func main() {
 		if err := db.Ping(); err != nil {
 			logger.Fatal().Err(err).Msg("DB pinging error")
 		}
+
+		instance, err := postgres.WithInstance(db, &postgres.Config{})
+		if err != nil {
+			logger.Err(err)
+			return
+		}
+		m, err := migrate.NewWithDatabaseInstance("file://db", "postgres", instance)
+		if err != nil {
+			logger.Err(err)
+			return
+		}
+		m.Up()
 	}
 
-	storage := storage.New(&logger, *cfg.StoreInterval, cfg.FileStoragePath)
+	var storage repository.Storage
+	if cfg.DatabaseDNS == "" {
+
+	} else {
+		storage = s.NewMemStorage(&logger, *cfg.StoreInterval, cfg.FileStoragePath)
+	}
 	repository := repository.New(&logger, storage)
 	metricHandler := handler.NewMetricHandler(&logger, repository)
 

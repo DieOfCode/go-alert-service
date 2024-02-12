@@ -21,20 +21,28 @@ type Service interface {
 	GetMetrics() (metrics.Data, error)
 }
 
-type MetricHandler struct {
+type MetricHandler interface {
+	GetMetricByName(w http.ResponseWriter, r *http.Request)
+	GetMetricByNameWithJson(w http.ResponseWriter, r *http.Request)
+	GetAllMetrics(w http.ResponseWriter, r *http.Request)
+	SaveMetric(w http.ResponseWriter, r *http.Request)
+	SaveMetricWithJson(w http.ResponseWriter, r *http.Request)
+}
+
+type Handler struct {
 	logger  *zerolog.Logger
 	service Service
 }
 
-func NewMetricHandler(l *zerolog.Logger, srv Service) *MetricHandler {
-	return &MetricHandler{
+func NewMetricHandler(l *zerolog.Logger, srv Service) *Handler {
+	return &Handler{
 		logger:  l,
 		service: srv,
 	}
 }
 
 // get metric
-func (h *MetricHandler) GetMetricByName(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetMetricByName(w http.ResponseWriter, r *http.Request) {
 	mtype := chi.URLParam(r, "type")
 	mname := chi.URLParam(r, "name")
 
@@ -54,7 +62,7 @@ func (h *MetricHandler) GetMetricByName(w http.ResponseWriter, r *http.Request) 
 }
 
 // get metric with json
-func (h *MetricHandler) GetMetricByNameWithJson(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetMetricByNameWithJson(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info().Any("req", r.Body).Msg("Request body")
 
 	var req metrics.Metric
@@ -76,7 +84,7 @@ func (h *MetricHandler) GetMetricByNameWithJson(w http.ResponseWriter, r *http.R
 }
 
 // get all metrics
-func (h *MetricHandler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 	allMetrics, err := h.service.GetMetrics()
 	if err != nil {
 		writeResponse(w, http.StatusInternalServerError, metrics.Error{Error: "Internal server error"})
@@ -118,7 +126,7 @@ const HTMLTemplateString = `
 `
 
 // post metric
-func (h *MetricHandler) SaveMetric(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SaveMetric(w http.ResponseWriter, r *http.Request) {
 	mtype := chi.URLParam(r, "type")
 	mname := chi.URLParam(r, "name")
 	mvalue := chi.URLParam(r, "value")
@@ -173,7 +181,7 @@ func (h *MetricHandler) SaveMetric(w http.ResponseWriter, r *http.Request) {
 }
 
 // post metric with json
-func (h *MetricHandler) SaveMetricWithJson(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SaveMetricWithJson(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info().Any("req", r.Body).Msg("Request body")
 
 	var req metrics.Metric

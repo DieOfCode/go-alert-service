@@ -18,7 +18,7 @@ type MemStorage struct {
 	storageFileName string
 }
 
-func New(logger *zerolog.Logger, interval int, file string) *MemStorage {
+func NewMemStorage(logger *zerolog.Logger, interval int, file string) *MemStorage {
 	return &MemStorage{
 		logger:          logger,
 		interval:        interval,
