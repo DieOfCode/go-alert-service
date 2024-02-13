@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,8 +13,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/golang-migrate/migrate"
-	"github.com/golang-migrate/migrate/database/postgres"
+
+	// "github.com/golang-migrate/migrate"
+	// "github.com/golang-migrate/migrate/database/postgres"
 	"github.com/rs/zerolog"
 
 	"github.com/DieOfCode/go-alert-service/internal/configuration"
@@ -45,18 +47,29 @@ func main() {
 			logger.Fatal().Err(err).Msg("DB pinging error")
 		}
 
-		instance, err := postgres.WithInstance(db, &postgres.Config{})
-		if err != nil {
-			print("proble getting instance")
-			logger.Err(err)
-			return
+		if _, err := db.Exec(`
+        CREATE TABLE IF NOT EXISTS metrics (
+			id VARCHAR NOT NULL,
+			type VARCHAR NOT NULL,
+			delta BIGINT,
+			value DOUBLE PRECISION,
+			UNIQUE (id, type)
+		)`); err != nil {
+			log.Fatalf("Error creating metrics table: %v", err)
 		}
-		m, err := migrate.NewWithDatabaseInstance("file://db", "postgres", instance)
-		if err != nil {
-			logger.Err(err)
-			return
-		}
-		m.Up()
+
+		// instance, err := postgres.WithInstance(db, &postgres.Config{})
+		// if err != nil {
+		// 	print("proble getting instance")
+		// 	logger.Err(err)
+		// 	return
+		// }
+		// m, err := migrate.NewWithDatabaseInstance("file://db", "postgres", instance)
+		// if err != nil {
+		// 	logger.Err(err)
+		// 	return
+		// }
+		// m.Up()
 	}
 
 	var storage repository.Storage
