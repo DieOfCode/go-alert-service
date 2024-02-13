@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"runtime"
 	"sync"
+	"time"
 
 	m "github.com/DieOfCode/go-alert-service/internal/metrics"
 	"github.com/rs/zerolog"
@@ -113,11 +114,11 @@ func (a *Agent) CollectMetrics() {
 	a.Metrics[len(m.GaugeMetrics)+1] = m.AgentMetric{MType: m.TypeCounter, ID: "PollCount", Delta: *a.counter}
 }
 
-func (a *Agent) SendAllMetrics(ctx context.Context) {
+func (a *Agent) SendAllMetrics(ctx context.Context) error {
 	b, err := json.Marshal(a.Metrics)
 	if err != nil {
 		a.logger.Error().Err(err).Msg("Marshalling error")
-		return
+		return err
 	}
 	a.logger.Info().Any("json", string(b)).Msg("Marshalled")
 
@@ -126,7 +127,7 @@ func (a *Agent) SendAllMetrics(ctx context.Context) {
 	n, err := a.gw.Write(b)
 	if err != nil {
 		a.logger.Error().Err(err).Msg("gw.Write error")
-		return
+		return err
 	}
 	a.gw.Close()
 
@@ -139,7 +140,7 @@ func (a *Agent) SendAllMetrics(ctx context.Context) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("http://%s/updates/", a.address), buf)
 	if err != nil {
 		a.logger.Error().Err(err).Msg("http.NewRequestWithContext method error")
-		return
+		return err
 	}
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Content-Encoding", "gzip")
@@ -147,8 +148,26 @@ func (a *Agent) SendAllMetrics(ctx context.Context) {
 	res, err := a.client.Do(req)
 	if err != nil {
 		a.logger.Error().Err(err).Msg("client.Do method error")
-		return
+		return err
 	}
 	res.Body.Close()
 	a.logger.Info().Any("metric", a.Metrics).Msg("Metrics are sent")
+	return nil
+}
+
+func (a *Agent) Retry(maxRetries int, fn func() error, intervals ...time.Duration) error {
+	var err error
+	err = fn()
+	if err == nil {
+		return nil
+	}
+	for i := 0; i < maxRetries; i++ {
+		a.logger.Info().Msgf("Retrying... (Attempt %d)", i+1)
+		time.Sleep(intervals[i])
+		if err = fn(); err == nil {
+			return nil
+		}
+	}
+	a.logger.Error().Err(err).Msg("Retrying... Failed")
+	return err
 }

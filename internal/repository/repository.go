@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/DieOfCode/go-alert-service/internal/metrics"
 
@@ -37,7 +38,15 @@ func New(l *zerolog.Logger, repo Storage) *Repository {
 
 func (s *Repository) GetMetric(mtype, mname string) (*metrics.Metric, error) {
 	m := s.repo.Load(mtype, mname)
-	if m == nil {
+
+	err := s.Retry(3, func() bool {
+		m = s.repo.Load(mtype, mname)
+		if m != nil {
+			return true
+		}
+		return false
+	}, 1*time.Second, 3*time.Second, 5*time.Second)
+	if err != nil {
 		return nil, fmt.Errorf("failed to load metric %s", mname)
 	}
 
@@ -45,8 +54,15 @@ func (s *Repository) GetMetric(mtype, mname string) (*metrics.Metric, error) {
 }
 
 func (s *Repository) GetMetrics() (metrics.Data, error) {
-	m := s.repo.LoadAll()
-	if m == nil {
+	var m metrics.Data
+	err := s.Retry(3, func() bool {
+		m = s.repo.LoadAll()
+		if m != nil {
+			return true
+		}
+		return false
+	}, 1*time.Second, 3*time.Second, 5*time.Second)
+	if err != nil {
 		return nil, errors.New("failed to load metrics")
 	}
 
@@ -74,4 +90,21 @@ func (s *Repository) SaveMetrics(m []metrics.Metric) error {
 	s.logger.Info().Msg("Metric is stored")
 
 	return nil
+}
+
+func (s *Repository) Retry(maxRetries int, fn func() bool, intervals ...time.Duration) error {
+	var ok bool
+	ok = fn()
+	if ok {
+		return nil
+	}
+	for i := 0; i < maxRetries; i++ {
+		s.logger.Info().Msgf("Retrying... (Attempt %d)", i+1)
+		time.Sleep(intervals[i])
+		if ok = fn(); ok {
+			return nil
+		}
+	}
+	s.logger.Error().Msg("Retrying... Failed")
+	return errors.New("err")
 }
