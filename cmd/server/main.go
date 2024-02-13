@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/golang-migrate/migrate"
 	"github.com/golang-migrate/migrate/database/postgres"
 	"github.com/rs/zerolog"
 
@@ -44,18 +45,18 @@ func main() {
 			logger.Fatal().Err(err).Msg("DB pinging error")
 		}
 
-		_, err := postgres.WithInstance(db, &postgres.Config{})
+		instance, err := postgres.WithInstance(db, &postgres.Config{})
 		if err != nil {
 			print("proble getting instance")
 			logger.Err(err)
 			return
 		}
-		// m, err := migrate.NewWithDatabaseInstance("file://db", "postgres", instance)
-		// if err != nil {
-		// 	logger.Err(err)
-		// 	return
-		// }
-		// m.Up()
+		m, err := migrate.NewWithDatabaseInstance("file://db", "postgres", instance)
+		if err != nil {
+			logger.Err(err)
+			return
+		}
+		m.Up()
 	}
 
 	var storage repository.Storage
