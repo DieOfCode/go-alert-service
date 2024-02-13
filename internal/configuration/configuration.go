@@ -59,6 +59,10 @@ func NewServer() (Config, error) {
 	}
 	if config.DatabaseDNS == "" {
 		config.DatabaseDNS = flags.DatabaseDNS
+		*config.Restore = false
+		config.FileStoragePath = ""
+		*config.StoreInterval = -1
+
 	}
 
 	return config, nil

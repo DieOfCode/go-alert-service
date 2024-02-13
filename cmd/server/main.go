@@ -12,7 +12,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/golang-migrate/migrate"
 	"github.com/golang-migrate/migrate/database/postgres"
 	"github.com/rs/zerolog"
 
@@ -34,26 +33,29 @@ func main() {
 	var db *sql.DB
 	logger.Info().Msg(cfg.DatabaseDNS)
 	if cfg.DatabaseDNS != "" {
+		print("inside bd init")
 		db, err = sql.Open("pgx", cfg.DatabaseDNS)
 		if err != nil {
 			logger.Fatal().Err(err).Msg("DB initializing error")
 		}
 		defer db.Close()
 		if err := db.Ping(); err != nil {
+			print("proble getting instance")
 			logger.Fatal().Err(err).Msg("DB pinging error")
 		}
 
-		instance, err := postgres.WithInstance(db, &postgres.Config{})
+		_, err := postgres.WithInstance(db, &postgres.Config{})
 		if err != nil {
+			print("proble getting instance")
 			logger.Err(err)
 			return
 		}
-		m, err := migrate.NewWithDatabaseInstance("file://db", "postgres", instance)
-		if err != nil {
-			logger.Err(err)
-			return
-		}
-		m.Up()
+		// m, err := migrate.NewWithDatabaseInstance("file://db", "postgres", instance)
+		// if err != nil {
+		// 	logger.Err(err)
+		// 	return
+		// }
+		// m.Up()
 	}
 
 	var storage repository.Storage
@@ -86,7 +88,7 @@ func main() {
 		r.MethodFunc(http.MethodPost, "/update/", metricHandler.SaveMetricWithJSON)
 		r.MethodFunc(http.MethodPost, "/updates/", metricHandler.SaveMetricsWithJSON)
 		r.MethodFunc(http.MethodPost, "/value/", metricHandler.GetMetricByNameWithJSON)
-		r.Method(http.MethodGet, "/ping/", DBPing(&logger, db))
+		r.Method(http.MethodGet, "/ping", DBPing(&logger, db))
 	})
 
 	server := http.Server{
@@ -144,6 +146,7 @@ func DBPing(logger *zerolog.Logger, db *sql.DB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logger.Info().Msg("Start DB PIMG")
 		if db == nil {
+			logger.Info().Msg("Dont have DB")
 			return
 		}
 		if err := db.Ping(); err != nil {
