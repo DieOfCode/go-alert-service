@@ -42,7 +42,7 @@ loop:
 			a.CollectMetrics()
 			logger.Info().Interface("metrics", a.Metrics).Msg("Metrics collected")
 		case <-report.C:
-			a.SendMetrics(ctx)
+			a.SendAllMetrics(ctx)
 			logger.Info().Interface("metrics", a.Metrics).Msg("Metrics sent")
 		case <-ctx.Done():
 			logger.Info().Err(ctx.Err()).Send()

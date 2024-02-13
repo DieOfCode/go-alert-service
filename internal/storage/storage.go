@@ -18,7 +18,7 @@ type MemStorage struct {
 	storageFileName string
 }
 
-func New(logger *zerolog.Logger, interval int, file string) *MemStorage {
+func NewMemStorage(logger *zerolog.Logger, interval int, file string) *MemStorage {
 	return &MemStorage{
 		logger:          logger,
 		interval:        interval,
@@ -129,5 +129,16 @@ func (s *MemStorage) Store(m metrics.Metric) bool {
 	}
 	s.logger.Info().Interface("Storage content", s.data).Send()
 
+	return true
+}
+
+func (s *MemStorage) StoreMetrics(metrics []metrics.Metric) bool {
+	var stored bool
+	for _, metric := range metrics {
+		stored = s.Store(metric)
+		if !stored {
+			return false
+		}
+	}
 	return true
 }
