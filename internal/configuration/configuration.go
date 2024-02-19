@@ -13,7 +13,7 @@ type Config struct {
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	Restore         *bool  `env:"RESTORE"`
 	StoreInterval   *int   `env:"STORE_INTERVAL"`
-	DatabaseDNS     string `env:"DATABASE_DSN"`
+	DatabaseDSN     string `env:"DATABASE_DSN"`
 }
 
 func NewAgent() (*Config, error) {
@@ -57,10 +57,10 @@ func NewServer() (Config, error) {
 	if config.FileStoragePath == "" {
 		config.FileStoragePath = flags.FileStoragePath
 	}
-	if config.DatabaseDNS == "" {
-		config.DatabaseDNS = flags.DatabaseDNS
+	if config.DatabaseDSN == "" {
+		config.DatabaseDSN = flags.DatabaseDSN
 	}
-	if config.DatabaseDNS != "" {
+	if config.DatabaseDSN != "" {
 		config.FileStoragePath = ""
 		*config.StoreInterval = -1
 		*config.Restore = false
@@ -92,7 +92,7 @@ func parseServerFlags() Config {
 	return Config{
 		ServerAddress:   *serverAddress,
 		FileStoragePath: *fileStoragePath,
-		DatabaseDNS:     *databaseDSN,
+		DatabaseDSN:     *databaseDSN,
 		Restore:         restore,
 		StoreInterval:   storeInterval,
 	}
