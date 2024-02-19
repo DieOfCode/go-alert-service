@@ -27,21 +27,25 @@ func Run() {
 	cfg, err := configuration.NewServer()
 	if err != nil {
 		logger.Fatal().Err(err).Msg("Configuration error")
-	}
-
-	var db *sql.DB
-	logger.Info().Msg(cfg.DatabaseDSN)
-	if cfg.DatabaseDSN != "" {
-		db = connectDB(&logger, &cfg)
+		return
 	}
 
 	var storage repository.Storage
-	if cfg.DatabaseDSN == "" {
+	var db *sql.DB
+	logger.Info().Msg(cfg.DatabaseDSN)
+	if cfg.DatabaseDSN != "" {
+		db, err = connectDB(&logger, &cfg)
+		if err != nil {
+			logger.Error().Err(err).Msg("DB initializing error")
+			return
+		}
+		defer db.Close()
+		storage = s.NewDatabaseStorage(&logger, db)
+	} else {
 		storage = s.NewMemStorage(&logger, *cfg.StoreInterval, cfg.FileStoragePath)
 
-	} else {
-		storage = s.NewDatabaseStorage(&logger, db)
 	}
+
 	repository := repository.New(&logger, storage)
 
 	server := NewServer(&logger, cfg.ServerAddress, repository, db)
@@ -95,16 +99,18 @@ func Run() {
 	logger.Info().Msg("Server stopped gracefully")
 }
 
-func connectDB(logger *zerolog.Logger, cfg *configuration.Config) *sql.DB {
+func connectDB(logger *zerolog.Logger, cfg *configuration.Config) (*sql.DB, error) {
 	print("inside bd init")
 	db, err := sql.Open("pgx", cfg.DatabaseDSN)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("DB initializing error")
+		return nil, err
 	}
 	defer db.Close()
 	if err := db.Ping(); err != nil {
 		print("proble getting instance")
 		logger.Fatal().Err(err).Msg("DB pinging error")
+		return nil, err
 	}
 
 	if _, err := db.Exec(`
@@ -116,8 +122,9 @@ func connectDB(logger *zerolog.Logger, cfg *configuration.Config) *sql.DB {
 		UNIQUE (id, type)
 	)`); err != nil {
 		log.Fatalf("Error creating metrics table: %v", err)
+		return nil, err
 	}
-	return db
+	return db, nil
 }
 
 func DBPing(logger *zerolog.Logger, db *sql.DB) http.Handler {
