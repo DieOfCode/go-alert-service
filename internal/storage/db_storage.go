@@ -117,10 +117,10 @@ func (storage *DatabaseStorage) Store(m metrics.Metric) bool {
 		return false
 	}
 
-	if m.MType == metrics.TypeCounter {
+	if mID != "" && m.MType == metrics.TypeCounter {
 		result, err := storage.db.Exec(
-			"INSERT INTO metrics (id, type, value) VALUES ($1, $2, $3) ON CONFLICT (id, type) DO UPDATE SET value = EXCLUDED.value",
-			m.ID, m.MType, mDelta.Int64+*m.Delta,
+			"UPDATE metrics SET delta = $1 WHERE id = $2 AND type = $3",
+			mDelta.Int64+*m.Delta, m.ID, m.MType,
 		)
 		if err != nil {
 			return false
@@ -160,13 +160,12 @@ func (storage *DatabaseStorage) Store(m metrics.Metric) bool {
 			"INSERT INTO metrics (id, type, value) VALUES ($1,$2,$3)",
 			m.ID, m.MType, *m.Value,
 		)
+	} else {
+		result, err = storage.db.Exec(
+			"INSERT INTO metrics (id, type, delta) VALUES ($1,$2,$3)",
+			m.ID, m.MType, *m.Delta,
+		)
 	}
-	// else {
-	// 	result, err = storage.db.Exec(
-	// 		"INSERT INTO metrics (id, type, delta) VALUES ($1,$2,$3)",
-	// 		m.ID, m.MType, *m.Delta,
-	// 	)
-	// }
 
 	if err != nil {
 		return false
