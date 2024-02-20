@@ -135,10 +135,10 @@ func (storage *DatabaseStorage) store(tx *sql.Tx, m metrics.Metric) error {
 	}
 
 	if m.MType == metrics.TypeCounter {
-		_, err = tx.Exec(
-			"INSERT INTO metrics  (id, type, delta) VALUES ($1,$2,$3) ON CONFLICT (id, type) DO UPDATE metrics SET delta = $1 WHERE id = $2 AND type = $3",
-			m.ID, m.MType, *m.Delta,
+		_, err = tx.Exec("INSERT INTO metrics (id, type, value) VALUES ($1, $2, $3) ON CONFLICT (id, type) DO UPDATE SET value = EXCLUDED.value",
+			m.ID, m.MType, *m.Value,
 		)
+
 		if err != nil {
 			storage.logger.Error().Err(err).Msg("store: error to store counter")
 			return err
