@@ -66,15 +66,15 @@ func (storage *DatabaseStorage) LoadAll() metrics.Data {
 	return result
 }
 
-func (storage *DatabaseStorage) StoreMetrics(metrics []metrics.Metric) bool {
-	var stored bool
+func (storage *DatabaseStorage) StoreMetrics(metrics []metrics.Metric) error {
+
 	for _, metric := range metrics {
-		stored = storage.Store(metric)
-		if !stored {
-			return false
+		err := storage.Store(metric)
+		if err != nil {
+			return err
 		}
 	}
-	return true
+	return nil
 }
 
 func (storage *DatabaseStorage) Load(mtype, mname string) *metrics.Metric {
@@ -108,7 +108,7 @@ func parseValue(mValue sql.NullFloat64) *float64 {
 	return nil
 }
 
-func (storage *DatabaseStorage) Store(m metrics.Metric) bool {
+func (storage *DatabaseStorage) Store(m metrics.Metric) error {
 	var query string
 	var args []interface{}
 
@@ -128,21 +128,11 @@ func (storage *DatabaseStorage) Store(m metrics.Metric) bool {
             WHERE metrics.type = 'gauge'
         `
 		args = append(args, m.ID, m.MType, *m.Value)
-	} else {
-		return false
 	}
 
-	result, err := storage.db.Exec(query, args...)
-	if err != nil {
-		return false
-	}
+	_, err := storage.db.Exec(query, args...)
 
-	affected, err := result.RowsAffected()
-	if err != nil || affected != 1 {
-		return false
-	}
-
-	return true
+	return err
 }
 
 func (storage *DatabaseStorage) RestoreFromFile() error {
