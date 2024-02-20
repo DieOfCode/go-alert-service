@@ -22,8 +22,8 @@ type Repository struct {
 type Storage interface {
 	Load(mtype, mname string) *metrics.Metric
 	LoadAll() metrics.Data
-	StoreMetric(m metrics.Metric) error
-	StoreMetrics(m []metrics.Metric) error
+	Store(m metrics.Metric) bool
+	StoreMetrics(m []metrics.Metric) bool
 	RestoreFromFile() error
 	WriteToFile() error
 }
@@ -60,7 +60,7 @@ func (s *Repository) SaveMetric(m metrics.Metric) error {
 		Str("name", m.ID).
 		Logger()
 	print("Metric try to store")
-	if err := s.repo.StoreMetric(m); err != nil {
+	if ok := s.repo.Store(m); !ok {
 		return ErrStoreData
 	}
 	logger.Info().Msg("Metric is stored")
@@ -69,7 +69,7 @@ func (s *Repository) SaveMetric(m metrics.Metric) error {
 }
 
 func (s *Repository) SaveMetrics(m []metrics.Metric) error {
-	if err := s.repo.StoreMetrics(m); err != nil {
+	if ok := s.repo.StoreMetrics(m); !ok {
 		return ErrStoreData
 	}
 	s.logger.Info().Msg("Metric is stored")

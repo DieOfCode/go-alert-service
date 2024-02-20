@@ -94,7 +94,7 @@ func (s *MemStorage) Load(mtype, mname string) *metrics.Metric {
 	return &mvalue
 }
 
-func (s *MemStorage) StoreMetric(m metrics.Metric) error {
+func (s *MemStorage) Store(m metrics.Metric) bool {
 	s.logger.Info().Interface("Start store", s.data).Send()
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -112,7 +112,7 @@ func (s *MemStorage) StoreMetric(m metrics.Metric) error {
 		s.data[m.MType] = map[string]metrics.Metric{
 			m.ID: {ID: m.ID, MType: m.MType, Value: m.Value, Delta: m.Delta},
 		}
-		return nil
+		return true
 	}
 
 	switch m.MType {
@@ -122,22 +122,23 @@ func (s *MemStorage) StoreMetric(m metrics.Metric) error {
 		selectedMetric, ok := metric[m.ID]
 		if !ok {
 			metric[m.ID] = metrics.Metric{ID: m.ID, MType: m.MType, Delta: m.Delta}
-			return nil
+			return true
 		}
 		*selectedMetric.Delta += *m.Delta
 		metric[m.ID] = metrics.Metric{ID: m.ID, MType: m.MType, Delta: selectedMetric.Delta}
 	}
 	s.logger.Info().Interface("Storage content", s.data).Send()
 
-	return nil
+	return true
 }
 
-func (s *MemStorage) StoreMetrics(metrics []metrics.Metric) error {
+func (s *MemStorage) StoreMetrics(metrics []metrics.Metric) bool {
+	var stored bool
 	for _, metric := range metrics {
-		errors := s.StoreMetric(metric)
-		if errors != nil {
-			return errors
+		stored = s.Store(metric)
+		if !stored {
+			return false
 		}
 	}
-	return nil
+	return true
 }
