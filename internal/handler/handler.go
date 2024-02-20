@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,6 +30,7 @@ type MetricHandler interface {
 	SaveMetric(w http.ResponseWriter, r *http.Request)
 	SaveMetricWithJSON(w http.ResponseWriter, r *http.Request)
 	SaveMetricsWithJSON(w http.ResponseWriter, r *http.Request)
+	DBPing(db *sql.DB) Handler
 }
 
 type Handler struct {
@@ -220,6 +222,22 @@ func (h *Handler) SaveMetricsWithJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeResponse(w, http.StatusOK, req)
+}
+
+func (h *Handler) DBPing(db *sql.DB) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.logger.Info().Msg("Start DB PIMG")
+		if db == nil {
+			h.logger.Info().Msg("Dont have DB")
+			return
+		}
+		if err := db.Ping(); err != nil {
+			h.logger.Error().Err(err).Msg("Pinging DB error")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
 }
 
 func writeResponse(w http.ResponseWriter, code int, v any) {
