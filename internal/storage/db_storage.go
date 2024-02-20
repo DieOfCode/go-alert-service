@@ -66,15 +66,28 @@ func (storage *DatabaseStorage) LoadAll() metrics.Data {
 	return result
 }
 
-func (storage *DatabaseStorage) StoreMetrics(metrics []metrics.Metric) bool {
-	var stored bool
+func (storage *DatabaseStorage) StoreMetrics(metrics []metrics.Metric) error {
+	tx, err := storage.db.Begin()
+	if err != nil {
+		storage.logger.Error().Err(err).Msg("StoreMetrics: begin transaction error")
+		return err
+	}
+
 	for _, metric := range metrics {
-		stored = storage.Store(metric)
-		if !stored {
-			return false
+		err = storage.store(tx, metric)
+		if err != nil {
+			storage.logger.Error().Err(err).Msg("StoreMetrics: store data error")
+			tx.Rollback()
+			return err
 		}
 	}
-	return true
+
+	if err := tx.Commit(); err != nil {
+		storage.logger.Error().Err(err).Msg("StoreMetrics: commit transaction error")
+		return err
+	}
+
+	return nil
 }
 
 func (storage *DatabaseStorage) Load(mtype, mname string) *metrics.Metric {
@@ -108,78 +121,150 @@ func parseValue(mValue sql.NullFloat64) *float64 {
 	return nil
 }
 
-func (storage *DatabaseStorage) Store(m metrics.Metric) bool {
+func (storage *DatabaseStorage) store(tx *sql.Tx, m metrics.Metric) error {
+	storage.logger.Info().Any("metric", m).Send()
+
 	var mID, mType string
 	var mDelta sql.NullInt64
 
-	raw := storage.db.QueryRow("SELECT id, type, delta FROM metrics WHERE id = $1 AND type = $2", m.ID, m.MType)
-	if err := raw.Scan(&mID, &mType, &mDelta); err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return false
+	raw := tx.QueryRow("SELECT id, type, delta FROM metrics WHERE id = $1 AND type = $2", m.ID, m.MType)
+	err := raw.Scan(&mID, &mType, &mDelta)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		storage.logger.Error().Err(err).Msg("store: scan row error")
+		return err
 	}
 
-	if mID != "" && m.MType == metrics.TypeCounter {
-		result, err := storage.db.Exec(
-			"UPDATE metrics SET delta = $1 WHERE id = $2 AND type = $3",
-			mDelta.Int64+*m.Delta, m.ID, m.MType,
-		)
+	if m.MType == metrics.TypeCounter {
+		switch {
+		case mID != "":
+			_, err = tx.Exec(
+				"UPDATE metrics SET delta = $1 WHERE id = $2 AND type = $3",
+				mDelta.Int64+*m.Delta, m.ID, m.MType,
+			)
+		default:
+			_, err = tx.Exec(
+				"INSERT INTO metrics (id, type, delta) VALUES ($1,$2,$3)",
+				m.ID, m.MType, *m.Delta,
+			)
+		}
 		if err != nil {
-			return false
+			storage.logger.Error().Err(err).Msg("store: error to store counter")
+			return err
 		}
-		affected, err := result.RowsAffected()
-		if err != nil {
-			return false
-		}
-		if affected != 1 {
-			return false
-		}
-		return true
 	}
 
-	if mID != "" && m.MType == metrics.TypeGauge {
-		result, err := storage.db.Exec(
-			"UPDATE metrics SET value = $1 WHERE id = $2 AND type = $3",
-			m.Value, m.ID, m.MType,
-		)
-		if err != nil {
-			return false
-		}
-		affected, err := result.RowsAffected()
-		if err != nil {
-			return false
-		}
-		if affected != 1 {
-			return false
-		}
-		return true
-	}
-
-	var result sql.Result
-	var err error
 	if m.MType == metrics.TypeGauge {
-		result, err = storage.db.Exec(
-			"INSERT INTO metrics (id, type, value) VALUES ($1,$2,$3)",
-			m.ID, m.MType, *m.Value,
-		)
-	} else {
-		result, err = storage.db.Exec(
-			"INSERT INTO metrics (id, type, delta) VALUES ($1,$2,$3)",
-			m.ID, m.MType, *m.Delta,
-		)
+		switch {
+		case mID != "":
+			_, err = tx.Exec(
+				"UPDATE metrics SET value = $1 WHERE id = $2 AND type = $3",
+				m.Value, m.ID, m.MType,
+			)
+		default:
+			_, err = tx.Exec(
+				"INSERT INTO metrics (id, type, value) VALUES ($1,$2,$3)",
+				m.ID, m.MType, *m.Value,
+			)
+		}
+		if err != nil {
+			storage.logger.Error().Err(err).Msg("store: error to store gauge")
+			return err
+		}
 	}
 
-	if err != nil {
-		return false
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return false
-	}
-	if affected != 1 {
-		return false
-	}
-
-	return true
+	return nil
 }
+
+func (storage *DatabaseStorage) StoreMetric(m metrics.Metric) error {
+	tx, err := storage.db.Begin()
+	if err != nil {
+		storage.logger.Error().Err(err).Msg("Store: begin transaction error")
+		return err
+	}
+	if err := storage.store(tx, m); err != nil {
+		storage.logger.Error().Err(err).Msg("Store: store data error")
+		tx.Rollback()
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		storage.logger.Error().Err(err).Msg("Store: commit transaction error")
+		return err
+	}
+	return nil
+}
+
+// func (storage *DatabaseStorage) Store(m metrics.Metric) bool {
+// 	var mID, mType string
+// 	var mDelta sql.NullInt64
+
+// 	raw := storage.db.QueryRow("SELECT id, type, delta FROM metrics WHERE id = $1 AND type = $2", m.ID, m.MType)
+// 	if err := raw.Scan(&mID, &mType, &mDelta); err != nil && !errors.Is(err, sql.ErrNoRows) {
+// 		return false
+// 	}
+
+// 	if mID != "" && m.MType == metrics.TypeCounter {
+// 		result, err := storage.db.Exec(
+// 			"UPDATE metrics SET delta = $1 WHERE id = $2 AND type = $3",
+// 			mDelta.Int64+*m.Delta, m.ID, m.MType,
+// 		)
+// 		if err != nil {
+// 			return false
+// 		}
+// 		affected, err := result.RowsAffected()
+// 		if err != nil {
+// 			return false
+// 		}
+// 		if affected != 1 {
+// 			return false
+// 		}
+// 		return true
+// 	}
+
+// 	if mID != "" && m.MType == metrics.TypeGauge {
+// 		result, err := storage.db.Exec(
+// 			"UPDATE metrics SET value = $1 WHERE id = $2 AND type = $3",
+// 			m.Value, m.ID, m.MType,
+// 		)
+// 		if err != nil {
+// 			return false
+// 		}
+// 		affected, err := result.RowsAffected()
+// 		if err != nil {
+// 			return false
+// 		}
+// 		if affected != 1 {
+// 			return false
+// 		}
+// 		return true
+// 	}
+
+// 	var result sql.Result
+// 	var err error
+// 	if m.MType == metrics.TypeGauge {
+// 		result, err = storage.db.Exec(
+// 			"INSERT INTO metrics (id, type, value) VALUES ($1,$2,$3)",
+// 			m.ID, m.MType, *m.Value,
+// 		)
+// 	} else {
+// 		result, err = storage.db.Exec(
+// 			"INSERT INTO metrics (id, type, delta) VALUES ($1,$2,$3)",
+// 			m.ID, m.MType, *m.Delta,
+// 		)
+// 	}
+
+// 	if err != nil {
+// 		return false
+// 	}
+// 	affected, err := result.RowsAffected()
+// 	if err != nil {
+// 		return false
+// 	}
+// 	if affected != 1 {
+// 		return false
+// 	}
+
+// 	return true
+// }
 
 func (storage *DatabaseStorage) RestoreFromFile() error {
 	return errNotSupported
