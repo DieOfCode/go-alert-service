@@ -109,72 +109,36 @@ func parseValue(mValue sql.NullFloat64) *float64 {
 }
 
 func (storage *DatabaseStorage) Store(m metrics.Metric) bool {
-	var mID, mType string
-	var mDelta sql.NullInt64
+	var query string
+	var args []interface{}
 
-	raw := storage.db.QueryRow("SELECT id, type, delta FROM metrics WHERE id = $1 AND type = $2", m.ID, m.MType)
-	if err := raw.Scan(&mID, &mType, &mDelta); err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return false
-	}
-
-	if mID != "" && m.MType == metrics.TypeCounter {
-		result, err := storage.db.Exec(
-			"UPDATE metrics SET delta = $1 WHERE id = $2 AND type = $3",
-			mDelta.Int64+*m.Delta, m.ID, m.MType,
-		)
-		if err != nil {
-			return false
-		}
-		affected, err := result.RowsAffected()
-		if err != nil {
-			return false
-		}
-		if affected != 1 {
-			return false
-		}
-		return true
-	}
-
-	if mID != "" && m.MType == metrics.TypeGauge {
-		result, err := storage.db.Exec(
-			"UPDATE metrics SET value = $1 WHERE id = $2 AND type = $3",
-			m.Value, m.ID, m.MType,
-		)
-		if err != nil {
-			return false
-		}
-		affected, err := result.RowsAffected()
-		if err != nil {
-			return false
-		}
-		if affected != 1 {
-			return false
-		}
-		return true
-	}
-
-	var result sql.Result
-	var err error
-	if m.MType == metrics.TypeGauge {
-		result, err = storage.db.Exec(
-			"INSERT INTO metrics (id, type, value) VALUES ($1,$2,$3)",
-			m.ID, m.MType, *m.Value,
-		)
+	if m.MType == metrics.TypeCounter {
+		query = `
+            INSERT INTO metrics (id, type, delta) VALUES ($1, $2, $3)
+            ON CONFLICT (id, type) DO UPDATE
+            SET delta = metrics.delta + EXCLUDED.delta
+            WHERE metrics.type = 'counter'
+        `
+		args = append(args, m.ID, m.MType, *m.Delta)
+	} else if m.MType == metrics.TypeGauge {
+		query = `
+            INSERT INTO metrics (id, type, value) VALUES ($1, $2, $3)
+            ON CONFLICT (id, type) DO UPDATE
+            SET value = EXCLUDED.value
+            WHERE metrics.type = 'gauge'
+        `
+		args = append(args, m.ID, m.MType, *m.Value)
 	} else {
-		result, err = storage.db.Exec(
-			"INSERT INTO metrics (id, type, delta) VALUES ($1,$2,$3)",
-			m.ID, m.MType, *m.Delta,
-		)
+		return false
 	}
 
+	result, err := storage.db.Exec(query, args...)
 	if err != nil {
 		return false
 	}
+
 	affected, err := result.RowsAffected()
-	if err != nil {
-		return false
-	}
-	if affected != 1 {
+	if err != nil || affected != 1 {
 		return false
 	}
 
