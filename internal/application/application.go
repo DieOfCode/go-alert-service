@@ -100,7 +100,6 @@ func Run() {
 }
 
 func connectDB(logger *zerolog.Logger, cfg *configuration.Config) (*sql.DB, error) {
-	print("inside bd init")
 	db, err := sql.Open("pgx", cfg.DatabaseDSN)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("DB initializing error")
