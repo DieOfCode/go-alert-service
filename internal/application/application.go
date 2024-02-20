@@ -105,9 +105,8 @@ func connectDB(logger *zerolog.Logger, cfg *configuration.Config) (*sql.DB, erro
 		logger.Fatal().Err(err).Msg("DB initializing error")
 		return nil, err
 	}
-	defer db.Close()
 	if err := db.Ping(); err != nil {
-		print("proble getting instance")
+		logger.Fatal().Err(err).Msg("proble getting instance")
 		logger.Fatal().Err(err).Msg("DB pinging error")
 		return nil, err
 	}
