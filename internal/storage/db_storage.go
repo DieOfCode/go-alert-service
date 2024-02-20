@@ -120,7 +120,7 @@ func (storage *DatabaseStorage) Store(m metrics.Metric) bool {
 	if m.MType == metrics.TypeCounter {
 		result, err := storage.db.Exec(
 			"INSERT INTO metrics (id, type, value) VALUES ($1, $2, $3) ON CONFLICT (id, type) DO UPDATE SET value = EXCLUDED.value",
-			mDelta.Int64+*m.Delta, m.ID, m.MType,
+			m.ID, m.MType, mDelta.Int64+*m.Delta,
 		)
 		if err != nil {
 			return false
