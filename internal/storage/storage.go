@@ -18,7 +18,7 @@ type MemStorage struct {
 	storageFileName string
 }
 
-func New(logger *zerolog.Logger, interval int, file string) *MemStorage {
+func NewMemStorage(logger *zerolog.Logger, interval int, file string) *MemStorage {
 	return &MemStorage{
 		logger:          logger,
 		interval:        interval,
@@ -94,7 +94,7 @@ func (s *MemStorage) Load(mtype, mname string) *metrics.Metric {
 	return &mvalue
 }
 
-func (s *MemStorage) Store(m metrics.Metric) bool {
+func (s *MemStorage) Store(m metrics.Metric) error {
 	s.logger.Info().Interface("Start store", s.data).Send()
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -103,7 +103,9 @@ func (s *MemStorage) Store(m metrics.Metric) bool {
 		defer func() {
 			if err := s.WriteToFile(); err != nil {
 				s.logger.Error().Err(err).Msg("Failed to write storage content to file")
+
 			}
+
 		}()
 	}
 
@@ -112,7 +114,7 @@ func (s *MemStorage) Store(m metrics.Metric) bool {
 		s.data[m.MType] = map[string]metrics.Metric{
 			m.ID: {ID: m.ID, MType: m.MType, Value: m.Value, Delta: m.Delta},
 		}
-		return true
+		return nil
 	}
 
 	switch m.MType {
@@ -122,12 +124,23 @@ func (s *MemStorage) Store(m metrics.Metric) bool {
 		selectedMetric, ok := metric[m.ID]
 		if !ok {
 			metric[m.ID] = metrics.Metric{ID: m.ID, MType: m.MType, Delta: m.Delta}
-			return true
+			return nil
 		}
 		*selectedMetric.Delta += *m.Delta
 		metric[m.ID] = metrics.Metric{ID: m.ID, MType: m.MType, Delta: selectedMetric.Delta}
 	}
 	s.logger.Info().Interface("Storage content", s.data).Send()
 
-	return true
+	return nil
+}
+
+func (s *MemStorage) StoreMetrics(metrics []metrics.Metric) error {
+
+	for _, metric := range metrics {
+		err := s.Store(metric)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

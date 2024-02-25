@@ -28,7 +28,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGKILL, syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	a := agent.New(&logger, client, cfg.ServerAddress)
+	a := agent.New(&logger, client, cfg)
 
 	logger.Info().
 		Int("pollInterval", cfg.PollInterval).
@@ -42,7 +42,10 @@ loop:
 			a.CollectMetrics()
 			logger.Info().Interface("metrics", a.Metrics).Msg("Metrics collected")
 		case <-report.C:
-			a.SendMetrics(ctx)
+			a.Retry(ctx, 3, func(ctx context.Context) error {
+				return a.SendAllMetrics(ctx)
+			}, 1*time.Second, 3*time.Second, 5*time.Second)
+
 			logger.Info().Interface("metrics", a.Metrics).Msg("Metrics sent")
 		case <-ctx.Done():
 			logger.Info().Err(ctx.Err()).Send()
