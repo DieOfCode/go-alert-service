@@ -85,7 +85,7 @@ func (a *Agent) SendMetrics(ctx context.Context) {
 
 			res, err := a.client.Do(req)
 			if err != nil {
-				a.logger.Error().Err(err).Msg("client.Do method error")
+				a.logger.Error().Err(err).Msg("clieчаnt.Do method error")
 				return
 			}
 			res.Body.Close()

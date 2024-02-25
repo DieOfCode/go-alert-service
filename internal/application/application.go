@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -107,7 +106,6 @@ func connectDB(logger *zerolog.Logger, cfg *configuration.Config) (*sql.DB, erro
 		return nil, err
 	}
 	if err := db.Ping(); err != nil {
-		logger.Fatal().Err(err).Msg("proble getting instance")
 		logger.Fatal().Err(err).Msg("DB pinging error")
 		return nil, err
 	}
@@ -120,7 +118,7 @@ func connectDB(logger *zerolog.Logger, cfg *configuration.Config) (*sql.DB, erro
 		value DOUBLE PRECISION,
 		UNIQUE (id, type)
 	)`); err != nil {
-		log.Fatalf("Error creating metrics table: %v", err)
+		logger.Fatal().Err(err).Msg(("Error creating metrics table"))
 		return nil, err
 	}
 	return db, nil
@@ -130,7 +128,7 @@ func DBPing(logger *zerolog.Logger, db *sql.DB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logger.Info().Msg("Start DB PIMG")
 		if db == nil {
-			logger.Info().Msg("Dont have DB")
+			logger.Error().Ctx(r.Context()).Msg("Dont have DB")
 			return
 		}
 		if err := db.Ping(); err != nil {

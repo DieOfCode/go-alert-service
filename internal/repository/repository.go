@@ -62,7 +62,6 @@ func (s *Repository) SaveMetric(m metrics.Metric) error {
 		Str("type", m.MType).
 		Str("name", m.ID).
 		Logger()
-	print("Metric try to store")
 
 	err := s.Retry(maxRetries, func() error {
 		if err := s.repo.Store(m); err != nil {
