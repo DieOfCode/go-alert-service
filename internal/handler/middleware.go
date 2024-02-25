@@ -1,11 +1,17 @@
 package handler
 
 import (
+	"bytes"
 	"compress/gzip"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"io"
 	"net/http"
 	"slices"
 	"time"
 
+	"github.com/DieOfCode/go-alert-service/internal/metrics"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/zerolog"
 )
@@ -59,6 +65,40 @@ func Decompress(l *zerolog.Logger) func(next http.Handler) http.Handler {
 			defer gr.Close()
 
 			r.Body = gr
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func CheckHash(key string) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hashSHA256 := r.Header.Get("HashSHA256")
+			if hashSHA256 == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+			h := hmac.New(sha256.New, []byte(key))
+			b, err := io.ReadAll(r.Body)
+			if err != nil {
+				writeResponse(w, http.StatusBadRequest, metrics.Error{Error: "Bad Request"})
+				return
+			}
+			if _, err := h.Write(b); err != nil {
+				writeResponse(w, http.StatusInternalServerError, metrics.Error{Error: "Internal Server Error"})
+				return
+			}
+			d := h.Sum(nil)
+			hh, err := hex.DecodeString(hashSHA256)
+			if err != nil {
+				writeResponse(w, http.StatusInternalServerError, metrics.Error{Error: "Internal Server Error"})
+				return
+			}
+			if !hmac.Equal(d, hh) {
+				writeResponse(w, http.StatusBadRequest, metrics.Error{Error: "Bad Request"})
+				return
+			}
+			r.Body = io.NopCloser(bytes.NewReader(b))
 			next.ServeHTTP(w, r)
 		})
 	}

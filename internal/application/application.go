@@ -49,7 +49,7 @@ func Run() {
 	repository := repository.New(&logger, storage)
 
 	server := NewServer(&logger, cfg.ServerAddress, repository, db)
-	server.RegisterHandler()
+	server.RegisterHandler(cfg)
 	if *cfg.Restore {
 		err := storage.RestoreFromFile()
 		if err != nil {
@@ -156,12 +156,13 @@ func NewServer(l *zerolog.Logger, addr string, repo *repository.Repository, db *
 	}
 }
 
-func (server *Server) RegisterHandler() {
-	metricHandler := handler.NewMetricHandler(server.logger, server.repo)
+func (server *Server) RegisterHandler(config configuration.Config) {
+	metricHandler := handler.NewMetricHandler(server.logger, server.repo, config.Key)
 
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
 		r.Use(middleware.RequestLogger(&handler.LogFormatter{Logger: server.logger}))
+		r.Use(handler.CheckHash(config.Key))
 		r.Use(middleware.Compress(5, "text/html", "application/json"))
 		r.Use(handler.Decompress(server.logger))
 		r.Use(middleware.Recoverer)

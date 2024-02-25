@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/DieOfCode/go-alert-service/internal/configuration"
 	m "github.com/DieOfCode/go-alert-service/internal/metrics"
 	"github.com/rs/zerolog"
 )
@@ -28,18 +32,20 @@ type Agent struct {
 	client  HTTPClient
 	Metrics []m.AgentMetric
 	address string
+	key     string
 	counter *int64
 	gw      *gzip.Writer
 }
 
-func New(logger *zerolog.Logger, client HTTPClient, address string) *Agent {
+func New(logger *zerolog.Logger, client HTTPClient, config *configuration.Config) *Agent {
 	counter := new(int64)
 	*counter = 0
 	return &Agent{
 		logger:  logger,
 		client:  client,
-		address: address,
+		address: config.ServerAddress,
 		counter: counter,
+		key:     config.Key,
 		gw:      gzip.NewWriter(io.Discard),
 		Metrics: make([]m.AgentMetric, len(m.GaugeMetrics)+2),
 	}
@@ -79,6 +85,17 @@ func (a *Agent) SendMetrics(ctx context.Context) {
 			if err != nil {
 				a.logger.Error().Err(err).Msg("http.NewRequestWithContext method error")
 				return
+			}
+			if a.key != "" {
+				bufCopy := *buf
+				h := hmac.New(sha256.New, []byte(a.key))
+				if _, err := h.Write(bufCopy.Bytes()); err != nil {
+					a.logger.Error().Err(err).Msg("Check KEY Error")
+					return
+				}
+				d := h.Sum(nil)
+				a.logger.Info().Msgf("hash: %x", d)
+				req.Header.Add("HashSHA256", hex.EncodeToString(d))
 			}
 			req.Header.Add("Content-Type", "application/json")
 			req.Header.Add("Content-Encoding", "gzip")

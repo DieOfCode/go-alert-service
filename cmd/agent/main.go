@@ -28,7 +28,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGKILL, syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	a := agent.New(&logger, client, cfg.ServerAddress)
+	a := agent.New(&logger, client, cfg)
 
 	logger.Info().
 		Int("pollInterval", cfg.PollInterval).

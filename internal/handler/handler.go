@@ -36,12 +36,14 @@ type MetricHandler interface {
 type Handler struct {
 	logger  *zerolog.Logger
 	service Service
+	key     string
 }
 
-func NewMetricHandler(l *zerolog.Logger, srv Service) *Handler {
+func NewMetricHandler(l *zerolog.Logger, srv Service, key string) *Handler {
 	return &Handler{
 		logger:  l,
 		service: srv,
+		key:     key,
 	}
 }
 
@@ -57,6 +59,9 @@ func (h *Handler) GetMetricByName(w http.ResponseWriter, r *http.Request) {
 	}
 	h.logger.Info().Any("metric", metric).Msg("Received metric from storage")
 
+	if h.key != "" {
+		w.Header().Add("HashSHA256", sign(metric, h.key))
+	}
 	switch mtype {
 	case metrics.TypeGauge:
 		writeResponse(w, http.StatusOK, *metric.Value)
@@ -84,6 +89,9 @@ func (h *Handler) GetMetricByNameWithJSON(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if h.key != "" {
+		w.Header().Add("HashSHA256", sign(res, h.key))
+	}
 	writeResponse(w, http.StatusOK, res)
 }
 
@@ -107,7 +115,9 @@ func (h *Handler) GetAllMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 
 	}
-
+	if h.key != "" {
+		w.Header().Add("HashSHA256", sign(allMetrics, h.key))
+	}
 	w.Header().Add("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
 	w.Write(buf.Bytes())
@@ -137,8 +147,6 @@ func (h *Handler) SaveMetric(w http.ResponseWriter, r *http.Request) {
 	mvalue := chi.URLParam(r, "value")
 
 	if mtype != metrics.TypeCounter && mtype != metrics.TypeGauge {
-		print(fmt.Sprintf("\n 1 ,%s", mtype))
-		print(fmt.Sprintf("\n 1.1 ,%s", r.URL.Path))
 		writeResponse(w, http.StatusBadRequest, metrics.Error{Error: "Bad request"})
 		return
 	}
@@ -149,7 +157,6 @@ func (h *Handler) SaveMetric(w http.ResponseWriter, r *http.Request) {
 	case metrics.TypeCounter:
 		delta, err := strconv.ParseInt(mvalue, 10, 0)
 		if err != nil {
-			print("\n\n 1")
 			writeResponse(w, http.StatusBadRequest, metrics.Error{Error: "Bad request"})
 			return
 		}
@@ -161,7 +168,6 @@ func (h *Handler) SaveMetric(w http.ResponseWriter, r *http.Request) {
 	case metrics.TypeGauge:
 		value, err := strconv.ParseFloat(mvalue, 64)
 		if err != nil {
-			print("\n\n 1")
 			writeResponse(w, http.StatusBadRequest, metrics.Error{Error: "Bad request"})
 			return
 		}
@@ -174,7 +180,6 @@ func (h *Handler) SaveMetric(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.service.SaveMetric(m); err != nil {
 		if errors.Is(err, repository.ErrParseMetric) {
-			print("\n\n 1")
 			writeResponse(w, http.StatusBadRequest, metrics.Error{Error: "Bad request"})
 			return
 		}
@@ -185,7 +190,6 @@ func (h *Handler) SaveMetric(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, http.StatusOK, fmt.Sprintf("metric %s of type %s with value %v has been set successfully", mname, mtype, mvalue))
 }
 
-// post metric with json
 func (h *Handler) SaveMetricWithJSON(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info().Any("req", r.Body).Msg("Request body")
 
