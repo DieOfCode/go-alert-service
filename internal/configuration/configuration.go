@@ -55,6 +55,7 @@ func NewServer() (Config, error) {
 	if config.Restore == nil {
 		config.Restore = flags.Restore
 	}
+
 	if config.StoreInterval == nil {
 		config.StoreInterval = flags.StoreInterval
 	}
