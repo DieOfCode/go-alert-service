@@ -14,8 +14,9 @@ import (
 	"github.com/DieOfCode/go-alert-service/internal/handler"
 	"github.com/DieOfCode/go-alert-service/internal/repository"
 	s "github.com/DieOfCode/go-alert-service/internal/storage"
-	"github.com/golang-migrate/migrate"
-	"github.com/golang-migrate/migrate/database/postgres"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
