@@ -101,7 +101,7 @@ func Run() {
 	logger.Info().Msg("Server stopped gracefully")
 }
 
-func ConnectDB(cfg *configuration.Config) (*sql.DB, error) {
+func connectDB(logger *zerolog.Logger, cfg *configuration.Config) (*sql.DB, error) {
 	db, err := sql.Open("pgx", cfg.DatabaseDSN)
 	if err != nil {
 		return nil, err
@@ -161,12 +161,11 @@ func NewServer(l *zerolog.Logger, addr string, repo *repository.Repository, db *
 }
 
 func (server *Server) RegisterHandler(config configuration.Config) {
-	metricHandler := handler.NewMetricHandler(server.logger, server.repo, config.Key)
+	metricHandler := handler.NewMetricHandler(server.logger, server.repo)
 
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
 		r.Use(middleware.RequestLogger(&handler.LogFormatter{Logger: server.logger}))
-		r.Use(handler.CheckHash(config.Key))
 		r.Use(middleware.Compress(5, "text/html", "application/json"))
 		r.Use(handler.Decompress(server.logger))
 		r.Use(middleware.Recoverer)
