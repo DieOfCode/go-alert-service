@@ -14,6 +14,8 @@ import (
 	"github.com/DieOfCode/go-alert-service/internal/handler"
 	"github.com/DieOfCode/go-alert-service/internal/repository"
 	s "github.com/DieOfCode/go-alert-service/internal/storage"
+	"github.com/golang-migrate/migrate"
+	"github.com/golang-migrate/migrate/database/postgres"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -49,7 +51,7 @@ func Run() {
 	repository := repository.New(&logger, storage)
 
 	server := NewServer(&logger, cfg.ServerAddress, repository, db)
-	server.RegisterHandler()
+	server.RegisterHandler(cfg)
 	if *cfg.Restore {
 		err := storage.RestoreFromFile()
 		if err != nil {
@@ -99,28 +101,30 @@ func Run() {
 	logger.Info().Msg("Server stopped gracefully")
 }
 
-func connectDB(logger *zerolog.Logger, cfg *configuration.Config) (*sql.DB, error) {
+func ConnectDB(cfg *configuration.Config) (*sql.DB, error) {
 	db, err := sql.Open("pgx", cfg.DatabaseDSN)
 	if err != nil {
-		logger.Fatal().Err(err).Msg("DB initializing error")
-		return nil, err
-	}
-	if err := db.Ping(); err != nil {
-		logger.Fatal().Err(err).Msg("DB pinging error")
 		return nil, err
 	}
 
-	if _, err := db.Exec(`
-	CREATE TABLE IF NOT EXISTS metrics (
-		id VARCHAR NOT NULL,
-		type VARCHAR NOT NULL,
-		delta BIGINT,
-		value DOUBLE PRECISION,
-		UNIQUE (id, type)
-	)`); err != nil {
-		logger.Fatal().Err(err).Msg(("Error creating metrics table"))
+	if err := db.Ping(); err != nil {
 		return nil, err
 	}
+
+	instance, err := postgres.WithInstance(db, &postgres.Config{})
+	if err != nil {
+		return nil, err
+	}
+
+	m, err := migrate.NewWithDatabaseInstance("file://db", "postgres", instance)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		return nil, err
+	}
+
 	return db, nil
 }
 
@@ -156,12 +160,13 @@ func NewServer(l *zerolog.Logger, addr string, repo *repository.Repository, db *
 	}
 }
 
-func (server *Server) RegisterHandler() {
-	metricHandler := handler.NewMetricHandler(server.logger, server.repo)
+func (server *Server) RegisterHandler(config configuration.Config) {
+	metricHandler := handler.NewMetricHandler(server.logger, server.repo, config.Key)
 
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
 		r.Use(middleware.RequestLogger(&handler.LogFormatter{Logger: server.logger}))
+		r.Use(handler.CheckHash(config.Key))
 		r.Use(middleware.Compress(5, "text/html", "application/json"))
 		r.Use(handler.Decompress(server.logger))
 		r.Use(middleware.Recoverer)

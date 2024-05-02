@@ -12,9 +12,9 @@ import (
 	"reflect"
 	"runtime"
 	"sync"
-	"time"
 
 	m "github.com/DieOfCode/go-alert-service/internal/metrics"
+	"github.com/cenkalti/backoff"
 	"github.com/rs/zerolog"
 )
 
@@ -155,32 +155,25 @@ func (a *Agent) SendAllMetrics(ctx context.Context) error {
 	return nil
 }
 
-func (a *Agent) Retry(ctx context.Context, maxRetries int, fn func(ctx context.Context) error, intervals ...time.Duration) error {
-	var err error
-	err = fn(ctx)
-	if err == nil {
-		return nil
-	}
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-	}
+func (a *Agent) Retry(ctx context.Context, maxRetries int, fn func(ctx context.Context) error) error {
+	// Инициализация экспоненциальной стратегии отката
+	expBackOff := backoff.NewExponentialBackOff()
+	expBackOff.MaxElapsedTime = 0                               // Убираем ограничение по времени
+	expBackOff.MaxInterval = backoff.DefaultMaxInterval         // Максимальный интервал между попытками
+	expBackOff.InitialInterval = backoff.DefaultInitialInterval // Начальный интервал
 
-	for i := 0; i < maxRetries; i++ {
-		a.logger.Info().Msgf("Retrying... (Attempt %d)", i+1)
-
-		t := time.NewTimer(intervals[i])
-		select {
-		case <-t.C:
-			if err = fn(ctx); err == nil {
-				return nil
-			}
-		case <-ctx.Done():
-			return ctx.Err()
+	operation := func() error {
+		err := fn(ctx)
+		if err != nil {
+			a.logger.Info().Msg("Retrying...")
 		}
-
+		return err
 	}
-	a.logger.Error().Err(err).Msg("Retrying... Failed")
+
+	// Воспользуемся функцией Retry из библиотеки backoff
+	err := backoff.Retry(operation, backoff.WithMaxRetries(expBackOff, uint64(maxRetries)))
+	if err != nil {
+		a.logger.Error().Err(err).Msg("Retrying... Failed")
+	}
 	return err
 }
