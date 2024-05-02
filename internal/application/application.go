@@ -14,7 +14,10 @@ import (
 	"github.com/DieOfCode/go-alert-service/internal/handler"
 	"github.com/DieOfCode/go-alert-service/internal/repository"
 	s "github.com/DieOfCode/go-alert-service/internal/storage"
+	"github.com/golang-migrate/migrate"
+	"github.com/golang-migrate/migrate/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -100,57 +103,62 @@ func Run() {
 	logger.Info().Msg("Server stopped gracefully")
 }
 
-func connectDB(logger *zerolog.Logger, cfg *configuration.Config) (*sql.DB, error) {
-	db, err := sql.Open("pgx", cfg.DatabaseDSN)
-	if err != nil {
-		logger.Fatal().Err(err).Msg("DB initializing error")
-		return nil, err
-	}
-	if err := db.Ping(); err != nil {
-		logger.Fatal().Err(err).Msg("DB pinging error")
-		return nil, err
-	}
-
-	if _, err := db.Exec(`
-	CREATE TABLE IF NOT EXISTS metrics (
-		id VARCHAR NOT NULL,
-		type VARCHAR NOT NULL,
-		delta BIGINT,
-		value DOUBLE PRECISION,
-		UNIQUE (id, type)
-		)`); err != nil {
-		logger.Fatal().Err(err).Msg(("Error creating metrics table"))
-		return nil, err
-	}
-	return db, nil
-}
-
 // func connectDB(logger *zerolog.Logger, cfg *configuration.Config) (*sql.DB, error) {
 // 	db, err := sql.Open("pgx", cfg.DatabaseDSN)
 // 	if err != nil {
+// 		logger.Fatal().Err(err).Msg("DB initializing error")
 // 		return nil, err
 // 	}
-
 // 	if err := db.Ping(); err != nil {
+// 		logger.Fatal().Err(err).Msg("DB pinging error")
 // 		return nil, err
 // 	}
 
-// 	instance, err := postgres.WithInstance(db, &postgres.Config{})
-// 	if err != nil {
+// 	if _, err := db.Exec(`
+// 	CREATE TABLE IF NOT EXISTS metrics (
+// 		id VARCHAR NOT NULL,
+// 		type VARCHAR NOT NULL,
+// 		delta BIGINT,
+// 		value DOUBLE PRECISION,
+// 		UNIQUE (id, type)
+// 		)`); err != nil {
+// 		logger.Fatal().Err(err).Msg(("Error creating metrics table"))
 // 		return nil, err
 // 	}
-
-// 	m, err := migrate.NewWithDatabaseInstance("file://db", "postgres", instance)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-// 		return nil, err
-// 	}
-
 // 	return db, nil
 // }
+
+func connectDB(logger *zerolog.Logger, cfg *configuration.Config) (*sql.DB, error) {
+	db, err := sql.Open("pgx", cfg.DatabaseDSN)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := db.Ping(); err != nil {
+		return nil, err
+	}
+
+	instance, err := postgres.WithInstance(db, &postgres.Config{})
+	if err != nil {
+		logger.Err(err).Msg(("Error creating metrics table"))
+
+		return nil, err
+	}
+
+	m, err := migrate.NewWithDatabaseInstance("file://db", "postgres", instance)
+	if err != nil {
+		logger.Err(err).Msg(("Error creating metrics table"))
+		return nil, err
+	}
+
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		logger.Err(err).Msg(("Error UP metrics table"))
+
+		return nil, err
+	}
+
+	return db, nil
+}
 
 func DBPing(logger *zerolog.Logger, db *sql.DB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
