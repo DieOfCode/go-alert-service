@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS metrics (
+CREATE TABLE metrics (
     id VARCHAR NOT NULL,
     type VARCHAR NOT NULL,
     delta BIGINT,
