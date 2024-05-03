@@ -1,3 +1,5 @@
+
+CREATE TYPE metric_type AS ENUM ('counter', 'gauge');
 CREATE TABLE metrics (
     id VARCHAR NOT NULL,
     type VARCHAR NOT NULL,
