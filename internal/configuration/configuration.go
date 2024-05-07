@@ -92,7 +92,7 @@ func parseAgentFlags() Config {
 }
 
 func parseServerFlags() Config {
-	serverAddress := flag.String("a", "localhost:8080", "address and port to run server")
+	serverAddress := flag.String("a", "localhost:8080", "address and port to run server ")
 	fileStoragePath := flag.String("f", "/tmp/metrics-db.json", "file storage path")
 	restore := flag.Bool("r", true, "restore")
 	storeInterval := flag.Int("i", 300, "interval")
