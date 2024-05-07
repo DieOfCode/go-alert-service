@@ -33,3 +33,9 @@ var GaugeMetrics = []string{
 	"PauseTotalNs", "StackInuse", "StackSys", "Sys",
 	"HeapInuse", "HeapObjects", "HeapReleased", "HeapSys", "LastGC", "Lookups", "MCacheInuse",
 }
+
+var GopsutilGaugeMetrics = []string{
+	"TotalMemory",
+	"FreeMemory",
+	"CPUutilization1",
+}

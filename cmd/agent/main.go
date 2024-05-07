@@ -20,8 +20,7 @@ func main() {
 	if err != nil {
 		logger.Fatal().Err(err).Msg("Configuration error")
 	}
-	poll := time.NewTicker(time.Duration(cfg.PollInterval) * time.Second)
-	report := time.NewTicker(time.Duration(cfg.ReportInterval) * time.Second)
+
 	client := &http.Client{
 		Timeout: time.Minute,
 	}
@@ -35,24 +34,13 @@ func main() {
 		Int("reportInterval", cfg.ReportInterval).
 		Msg("Started collecting metrics")
 
-loop:
-	for {
-		select {
-		case <-poll.C:
-			a.CollectMetrics()
-			logger.Info().Interface("metrics", a.Metrics).Msg("Metrics collected")
-		case <-report.C:
-			a.Retry(ctx, 3, func(ctx context.Context) error {
-				return a.SendAllMetrics(ctx)
-			})
+	go a.CollectRuntimeMetrics(ctx, time.Duration(cfg.PollInterval))
+	go a.CollectGopsutilMetrics(ctx, time.Duration(cfg.PollInterval))
 
-			logger.Info().Interface("metrics", a.Metrics).Msg("Metrics sent")
-		case <-ctx.Done():
-			logger.Info().Err(ctx.Err()).Send()
-			poll.Stop()
-			report.Stop()
-			break loop
-		}
+	for i := 0; i < cfg.RateLimit; i++ {
+		go a.Retry(ctx, 3, func(ct context.Context) error {
+			return a.SendMetrics(ct)
+		})
 	}
 	logger.Info().Msg("Finished collecting metrics")
 }

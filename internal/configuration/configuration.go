@@ -15,6 +15,7 @@ type Config struct {
 	StoreInterval   *int   `env:"STORE_INTERVAL"`
 	DatabaseDSN     string `env:"DATABASE_DSN"`
 	Key             string `env:"KEY"`
+	RateLimit       int    `env:"RATE_LIMIT"`
 }
 
 func NewAgent() (*Config, error) {
@@ -36,6 +37,9 @@ func NewAgent() (*Config, error) {
 	}
 	if config.Key == "" {
 		config.Key = flags.Key
+	}
+	if config.RateLimit == 0 {
+		config.RateLimit = flags.RateLimit
 	}
 
 	return &config, nil
@@ -68,6 +72,9 @@ func NewServer() (Config, error) {
 	if config.Key == "" {
 		config.Key = flags.Key
 	}
+	if config.RateLimit == 0 {
+		config.RateLimit = flags.RateLimit
+	}
 	if config.DatabaseDSN != "" {
 		config.FileStoragePath = ""
 		*config.StoreInterval = -1
@@ -82,12 +89,14 @@ func parseAgentFlags() Config {
 	reportInterval := flag.Int("r", 10, "report interval to the server (in seconds)")
 	pollInterval := flag.Int("p", 2, "interval to gather metrics (in seconds)")
 	key := flag.String("k", "", "")
+	rateLimit := flag.Int("l", 1, "rate limit")
 	flag.Parse()
 	return Config{
 		ServerAddress:  *serverAddress,
 		ReportInterval: *reportInterval,
 		PollInterval:   *pollInterval,
 		Key:            *key,
+		RateLimit:      *rateLimit,
 	}
 }
 
