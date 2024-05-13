@@ -192,11 +192,13 @@ func NewServer(l *zerolog.Logger, addr string, repo *repository.Repository, db *
 }
 
 func (server *Server) RegisterHandler(config configuration.Config) {
-	metricHandler := handler.NewMetricHandler(server.logger, server.repo)
+
+	metricHandler := handler.NewMetricHandler(server.logger, server.repo, config.Key)
 
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
 		r.Use(middleware.RequestLogger(&handler.LogFormatter{Logger: server.logger}))
+		r.Use(handler.CheckHash(config.Key))
 		r.Use(middleware.Compress(5, "text/html", "application/json"))
 		r.Use(handler.Decompress(server.logger))
 		r.Use(middleware.Recoverer)
