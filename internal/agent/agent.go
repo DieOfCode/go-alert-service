@@ -54,51 +54,132 @@ func New(logger *zerolog.Logger, client HTTPClient, config *configuration.Config
 	}
 }
 
-func (a *Agent) SendMetrics(ctx context.Context) error {
-	b, err := json.Marshal(a.Metrics)
-	if err != nil {
-		a.logger.Error().Err(err).Msg("Marshalling error")
-		return err
-	}
-	a.logger.Info().Any("json", string(b)).Msg("Marshalled")
-	buf := &bytes.Buffer{}
-	a.gw.Reset(buf)
-	n, err := a.gw.Write(b)
-	if err != nil {
-		a.logger.Error().Err(err).Msg("gw.Write error")
-		return err
-	}
-	a.gw.Close()
-	a.logger.Info().
-		Int("len of b", len(b)).
-		Int("written bytes", n).
-		Int("len of buf", len(buf.Bytes())).
-		Send()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("http://%s/updates/", a.address), buf)
-	if err != nil {
-		a.logger.Error().Err(err).Msg("http.NewRequestWithContext method error")
-		return err
-	}
-	if a.key != "" {
-		buf2 := *buf
-		h := hmac.New(sha256.New, []byte(a.key))
-		if _, err := h.Write(buf2.Bytes()); err != nil {
-			return err
+// func (a *Agent) SendMetrics(ctx context.Context) error {
+// 	b, err := json.Marshal(a.Metrics)
+// 	if err != nil {
+// 		a.logger.Error().Err(err).Msg("Marshalling error")
+// 		return err
+// 	}
+// 	a.logger.Info().Any("json", string(b)).Msg("Marshalled")
+// 	buf := &bytes.Buffer{}
+// 	a.gw.Reset(buf)
+// 	n, err := a.gw.Write(b)
+// 	if err != nil {
+// 		a.logger.Error().Err(err).Msg("gw.Write error")
+// 		return err
+// 	}
+// 	a.gw.Close()
+// 	a.logger.Info().
+// 		Int("len of b", len(b)).
+// 		Int("written bytes", n).
+// 		Int("len of buf", len(buf.Bytes())).
+// 		Send()
+// 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("http://%s/updates/", a.address), buf)
+// 	if err != nil {
+// 		a.logger.Error().Err(err).Msg("http.NewRequestWithContext method error")
+// 		return err
+// 	}
+// 	if a.key != "" {
+// 		buf2 := *buf
+// 		h := hmac.New(sha256.New, []byte(a.key))
+// 		if _, err := h.Write(buf2.Bytes()); err != nil {
+// 			return err
+// 		}
+// 		d := h.Sum(nil)
+// 		a.logger.Info().Msgf("hash: %x", d)
+// 		req.Header.Add("HashSHA256", hex.EncodeToString(d))
+// 	}
+// 	req.Header.Add("Content-Type", "application/json")
+// 	req.Header.Add("Content-Encoding", "gzip")
+// 	res, err := a.client.Do(req)
+// 	if err != nil {
+// 		a.logger.Error().Err(err).Msg("client.Do method error")
+// 		return err
+// 	}
+// 	res.Body.Close()
+// 	a.logger.Info().Any("metric", a.Metrics).Msg("Metrics are sent")
+// 	return nil
+// }
+
+func (a *Agent) PrepareMetrics(ctx context.Context, interval time.Duration) <-chan []m.AgentMetric {
+	ch := make(chan []m.AgentMetric)
+	wg := &sync.WaitGroup{}
+
+	poll := time.NewTicker(interval)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-poll.C:
+				ch <- a.Metrics
+			case <-ctx.Done():
+				poll.Stop()
+				return
+			}
 		}
-		d := h.Sum(nil)
-		a.logger.Info().Msgf("hash: %x", d)
-		req.Header.Add("HashSHA256", hex.EncodeToString(d))
+	}()
+
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+
+	return ch
+}
+
+func (a *Agent) SendMetrics(ctx context.Context, metrics <-chan []m.AgentMetric) error {
+	for {
+		m, ok := <-metrics
+		if !ok {
+			return nil
+		} else {
+			b, err := json.Marshal(m)
+			if err != nil {
+				a.logger.Error().Err(err).Msg("Marshalling error")
+				return err
+			}
+			a.logger.Info().Any("json", string(b)).Msg("Marshalled")
+			buf := &bytes.Buffer{}
+			a.gw.Reset(buf)
+			n, err := a.gw.Write(b)
+			if err != nil {
+				a.logger.Error().Err(err).Msg("gw.Write error")
+				return err
+			}
+			a.gw.Close()
+			a.logger.Info().
+				Int("len of b", len(b)).
+				Int("written bytes", n).
+				Int("len of buf", len(buf.Bytes())).
+				Send()
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("http://%s/updates/", a.address), buf)
+			if err != nil {
+				a.logger.Error().Err(err).Msg("http.NewRequestWithContext method error")
+				return err
+			}
+			if a.key != "" {
+				buf2 := *buf
+				h := hmac.New(sha256.New, []byte(a.key))
+				if _, err := h.Write(buf2.Bytes()); err != nil {
+					return err
+				}
+				d := h.Sum(nil)
+				a.logger.Info().Msgf("hash: %x", d)
+				req.Header.Add("HashSHA256", hex.EncodeToString(d))
+			}
+			req.Header.Add("Content-Type", "application/json")
+			req.Header.Add("Content-Encoding", "gzip")
+			res, err := a.client.Do(req)
+			if err != nil {
+				a.logger.Error().Err(err).Msg("client.Do method error")
+				return err
+			}
+			res.Body.Close()
+			a.logger.Info().Any("metric", a.Metrics).Msg("Metrics are sent")
+			return nil
+		}
 	}
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Content-Encoding", "gzip")
-	res, err := a.client.Do(req)
-	if err != nil {
-		a.logger.Error().Err(err).Msg("client.Do method error")
-		return err
-	}
-	res.Body.Close()
-	a.logger.Info().Any("metric", a.Metrics).Msg("Metrics are sent")
-	return nil
 }
 
 func (a *Agent) CollectRuntimeMetrics(ctx context.Context, interval time.Duration) {
